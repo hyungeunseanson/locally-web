@@ -60,6 +60,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20261005082309',
       '20261005104924',
       '20261006013755',
+      '20261006105322',
       '20261006133015',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
@@ -86,15 +87,16 @@ test.describe('Supabase staging bootstrap contract', () => {
       'supabase/migrations/20261005082309_avatar_media_authority.sql',
       'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql',
       'supabase/migrations/20261006013755_host_profile_media_authority.sql',
+      'supabase/migrations/20261006105322_community_media_authority.sql',
       'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
     ]);
     expect(manifest.pendingPrivateTables).toBeUndefined();
     expect(manifest.pendingApplicationFunctions).toBeUndefined();
-    expect(manifest.applicationPrivateTables).toEqual(["private.admin_monitor_cutover", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks"]);
+    expect(manifest.applicationPrivateTables).toEqual(["private.admin_monitor_cutover", "private.community_media_authority", "private.community_media_context", "private.community_media_plan_receipts", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks"]);
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([{"version": "20261006105322", "name": "community_media_authority", "repositoryFile": "supabase/migrations/20261006105322_community_media_authority.sql", "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912"}]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -102,10 +104,10 @@ test.describe('Supabase staging bootstrap contract', () => {
 
   test('keeps the schema inventory and assertion transactions read-only', () => {
     const capture = readFileSync(currentManifest.source.captureSql, 'utf8');
-    expect(capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm)).toHaveLength(6);
-    expect(capture.match(/^ROLLBACK;$/gm)).toHaveLength(6);
+    expect(capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm)).toHaveLength(7);
+    expect(capture.match(/^ROLLBACK;$/gm)).toHaveLength(7);
     expect(currentManifest.migrationLedger.slice(-4).map((entry: { version: string }) => entry.version))
-      .toEqual(['20261005082309', '20261005104924', '20261006013755', '20261006133015']);
+      .toEqual(['20261005104924', '20261006013755', '20261006105322', '20261006133015']);
     expect(currentManifest.migrationLedger.some((entry: { version: string }) => entry.version === '20261005104924')).toBe(true);
     expect(currentManifest.pendingProductionMigrations).toEqual(manifest.pendingProductionMigrations);
     expect(currentManifest.appliedFinancialAuthority.functions).toHaveLength(25);
@@ -225,8 +227,8 @@ test.describe('Supabase staging bootstrap contract', () => {
         ledgerStatementsSha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
       },
     ]);
-    expect(currentManifest.schemaContractVersion).toBe(8);
-    expect(manifest.schemaContractVersion).toBe(8);
+    expect(currentManifest.schemaContractVersion).toBe(9);
+    expect(manifest.schemaContractVersion).toBe(9);
     expect(currentManifest.migrationLedger.slice(17, 19)).toEqual([
       {
         version: '20261003012400', name: 'phone_followup_tasks', repositoryVersion: '20261002140902',
@@ -257,7 +259,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('CURRENT_STATE_CATALOG_DRIFT_TEST_PASS');
-    expect(result.stdout).toContain('"driftChecks":82');
+    expect(result.stdout).toContain('"driftChecks":88');
     expect(result.stdout).toContain('"staticDriftChecks":5');
     expect(result.stdout).toContain('"productionMutation":0');
   });
@@ -368,20 +370,28 @@ test.describe('Supabase staging bootstrap contract', () => {
   test('models the exact Production current-state inventory and concierge boundary', () => {
     expect(currentManifest.objects.publicTables).toHaveLength(44);
     expect(currentManifest.objects.publicViews).toHaveLength(2);
-    expect(currentManifest.objects.publicTableColumns).toBe(605);
+    expect(currentManifest.objects.publicTableColumns).toBe(606);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(99);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(107);
     expect(currentManifest.objects.privateFunctionOverloads).toEqual([
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
   "private.advance_support_version()",
+  "private.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)",
   "private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)",
   "private.assert_booking_payout_safe(p_booking bookings)",
   "private.bump_experience_media_revision()",
   "private.canonical_experience_media_locator(p_url text)",
   "private.capture_phone_followup()",
+  "private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])",
+  "private.community_media_backup_contract()",
+  "private.community_media_migration_inventory()",
   "private.delete_pending_phone_followup()",
   "private.guard_booking_money_transition()",
+  "private.guard_community_asset_identity()",
+  "private.guard_community_media_writer()",
+  "private.guard_community_physical_delete()",
+  "private.guard_community_reference_zero_journal()",
   "private.guard_host_profile_legacy_writer()",
   "private.guard_host_profile_reference_zero_journal()",
   "private.guard_unresolved_booking_delete()",
@@ -395,20 +405,22 @@ test.describe('Supabase staging bootstrap contract', () => {
   "private.lock_booking_money(p_experience_id bigint)",
   "private.lock_host_profile_owner()",
   "private.prepare_support_message()",
+  "private.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)",
   "private.solo_refund_due(p_booking bookings)",
+  "private.sync_community_media_assets()",
   "private.sync_experience_media_assets()",
   "private.sync_host_profile_assets()",
   "private.sync_profile_avatar_assets()"
 ]);
-    expect(currentManifest.objects.applicationTriggers).toHaveLength(37);
+    expect(currentManifest.objects.applicationTriggers).toHaveLength(43);
     expect(currentManifest.objects.indexes).toBe(150);
-    expect(currentManifest.objects.privateTables).toEqual(["admin_monitor_cutover", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
-    expect(currentManifest.objects.privateTableColumns).toBe(19);
-    expect(currentManifest.objects.privateIndexes).toBe(7);
-    expect(currentManifest.objects.privateConstraints).toBe(15);
+    expect(currentManifest.objects.privateTables).toEqual(["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
+    expect(currentManifest.objects.privateTableColumns).toBe(29);
+    expect(currentManifest.objects.privateIndexes).toBe(10);
+    expect(currentManifest.objects.privateConstraints).toBe(21);
     expect(currentManifest.objects.constraints).toEqual({
-      "check": 100,
-      "total": 224,
+      "check": 101,
+      "total": 225,
       "unique": 18,
       "foreignKey": 62,
       "primaryKey": 44
@@ -426,7 +438,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
       publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
       publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-      privateRelationGrants: 'ee6e712c55f00b284ed8a988b04b163d',
+      privateRelationGrants: '5c6eec1ba4930757fff2e15e64d79d30',
       stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
     });
     for (const fingerprint of [

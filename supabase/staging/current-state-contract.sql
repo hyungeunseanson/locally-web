@@ -41,6 +41,7 @@ BEGIN
     '20261005082309:avatar_media_authority',
     '20261005104924:solo_guarantee_financial_authority',
     '20261006013755:host_profile_media_authority',
+    '20261006105322:community_media_authority',
     '20261006133015:admin_chat_canonical_recency'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
@@ -106,8 +107,8 @@ BEGIN
     INTO actual_count
     FROM information_schema.columns
    WHERE table_schema = 'public' AND table_name = ANY (expected);
-  IF actual_count <> 605 THEN
-    RAISE EXCEPTION 'public table column count %, expected 605', actual_count;
+  IF actual_count <> 606 THEN
+    RAISE EXCEPTION 'public table column count %, expected 606', actual_count;
   END IF;
 
   SELECT array_agg(class_def.relname ORDER BY class_def.relname)
@@ -144,6 +145,7 @@ BEGIN
   expected := ARRAY[
     'public.ack_admin_inquiry_messages(p_inquiry_id bigint, p_through_message_id bigint)',
     'public.ack_admin_inquiry_snapshot(p_inquiry_id bigint, p_message_ids bigint[])',
+    'public.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)',
     'public.apply_experience_media_locator_cas(p_experience_id bigint, p_before_photos text[], p_before_image_url text, p_before_itinerary jsonb, p_before_itinerary_i18n jsonb, p_after_photos text[], p_after_image_url text, p_after_itinerary jsonb, p_after_itinerary_i18n jsonb)',
     'public.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)',
     'public.apply_solo_refund_settlement_atomic(p_operation_id uuid)',
@@ -151,6 +153,7 @@ BEGIN
     'public.attach_experience_payment_provider_reference_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text, p_claim_token uuid)',
     'public.avatar_migration_inventory()',
     'public.begin_avatar_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
+    'public.begin_community_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
     'public.begin_experience_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text, p_parent_id text)',
     'public.begin_experience_payment_capture_atomic(p_booking_id text, p_user_id uuid, p_provider_reference text)',
     'public.begin_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)',
@@ -165,7 +168,10 @@ BEGIN
     'public.claim_experience_payment_atomic(p_booking_id text, p_user_id uuid, p_provider text, p_provider_reference text)',
     'public.claim_media_deletion(p_asset_id uuid, p_enabled boolean, p_minimum_age_ms bigint)',
     'public.claim_solo_refund_atomic(p_booking_id text)',
+    'public.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])',
     'public.commit_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_sha256 text, p_size bigint)',
+    'public.community_media_backup_contract()',
+    'public.community_media_migration_inventory()',
     'public.complete_admin_manual_experience_payout_atomic(p_request_key uuid, p_host_id uuid, p_settlement_type text, p_expected_current_booking_amount integer, p_legacy_amount integer, p_reason text, p_legacy_source_reference text, p_transfer_reference text, p_paid_by_admin_id uuid, p_paid_by_admin_email text)',
     'public.complete_experience_booking_if_due_atomic(p_booking_id text)',
     'public.complete_manual_solo_refund_atomic(p_booking_id text, p_amount integer, p_proof_reference text, p_transaction_reference text, p_admin_id uuid)',
@@ -208,6 +214,7 @@ BEGIN
     'public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])',
     'public.list_due_experience_completion_candidates(p_booking_id text)',
     'public.list_due_experience_review_request_candidates(p_limit integer)',
+    'public.mark_community_media_uploaded(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
     'public.mark_room_messages_read(p_room_id uuid, p_user_id uuid)',
     'public.mark_solo_refund_delivery_failed_atomic(p_operation_id uuid)',
     'public.plan_media_owner_deletion(p_owner_id uuid)',
@@ -230,6 +237,7 @@ BEGIN
     'public.rollback_profile_avatar(p_owner_id uuid, p_asset_id uuid, p_expected_url text, p_old_url text)',
     'public.search_admin_chat(p_surface text, p_query text)',
     'public.select_service_host_atomic(p_customer_id uuid, p_request_id uuid, p_application_id uuid)',
+    'public.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)',
     'public.set_proxy_comments_updated_at()',
     'public.set_proxy_requests_updated_at()',
     'public.set_service_applications_updated_at()',
@@ -239,6 +247,7 @@ BEGIN
     'public.snapshot_booking_guest_demographics()',
     'public.solo_refund_diagnostics()',
     'public.verify_avatar_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
+    'public.verify_community_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
     'public.verify_experience_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)',
     'public.verify_host_profile_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)'
   ]::text[];
@@ -260,13 +269,21 @@ BEGIN
     'private.admin_chat_phone_title(category text, form_data jsonb)',
     'private.adopt_phone_followup_link()',
     'private.advance_support_version()',
+    'private.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)',
     'private.apply_host_profile_media_locators(p_owner_id uuid, p_asset_id uuid, p_old_url text, p_references jsonb, p_rollback boolean)',
     'private.assert_booking_payout_safe(p_booking bookings)',
     'private.bump_experience_media_revision()',
     'private.canonical_experience_media_locator(p_url text)',
     'private.capture_phone_followup()',
+    'private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])',
+    'private.community_media_backup_contract()',
+    'private.community_media_migration_inventory()',
     'private.delete_pending_phone_followup()',
     'private.guard_booking_money_transition()',
+    'private.guard_community_asset_identity()',
+    'private.guard_community_media_writer()',
+    'private.guard_community_physical_delete()',
+    'private.guard_community_reference_zero_journal()',
     'private.guard_host_profile_legacy_writer()',
     'private.guard_host_profile_reference_zero_journal()',
     'private.guard_unresolved_booking_delete()',
@@ -280,7 +297,9 @@ BEGIN
     'private.lock_booking_money(p_experience_id bigint)',
     'private.lock_host_profile_owner()',
     'private.prepare_support_message()',
+    'private.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)',
     'private.solo_refund_due(p_booking bookings)',
+    'private.sync_community_media_assets()',
     'private.sync_experience_media_assets()',
     'private.sync_host_profile_assets()',
     'private.sync_profile_avatar_assets()'
@@ -347,6 +366,9 @@ BEGIN
     'public.community_comments.on_comment_removed',
     'public.community_likes.on_like_added',
     'public.community_likes.on_like_removed',
+    'public.community_posts.a_community_media_writer',
+    'public.community_posts.community_media_delete_plan',
+    'public.community_posts.community_media_finalize',
     'public.experiences.experience_media_delete_plan',
     'public.experiences.experience_media_finalize',
     'public.experiences.experience_media_revision',
@@ -358,6 +380,9 @@ BEGIN
     'public.inquiry_messages.inquiry_support_message',
     'public.inquiry_messages.phone_followup_capture',
     'public.inquiry_messages.phone_followup_delete',
+    'public.media_assets.community_asset_identity_immutable',
+    'public.media_deletion_journal.community_physical_delete_disabled',
+    'public.media_deletion_journal.community_reference_zero_journal',
     'public.media_deletion_journal.host_profile_reference_zero_journal',
     'public.profiles.b_profile_legacy_host_writer',
     'public.profiles.legacy_host_profile_delete_plan',
@@ -400,8 +425,8 @@ BEGIN
     JOIN pg_class AS class_def ON class_def.oid = constraint_def.conrelid
     JOIN pg_namespace AS namespace_def ON namespace_def.oid = class_def.relnamespace
    WHERE namespace_def.nspname = 'public';
-  IF actual_count <> 224 OR primary_key_count <> 44 OR foreign_key_count <> 62
-     OR unique_count <> 18 OR check_count <> 100 THEN
+  IF actual_count <> 225 OR primary_key_count <> 44 OR foreign_key_count <> 62
+     OR unique_count <> 18 OR check_count <> 101 THEN
     RAISE EXCEPTION 'constraint counts differ: total %, PK %, FK %, UNIQUE %, CHECK %',
       actual_count, primary_key_count, foreign_key_count, unique_count, check_count;
   END IF;
@@ -914,7 +939,7 @@ BEGIN
   ]::text[] THEN
     RAISE EXCEPTION 'applied media index mismatch';
   END IF;
-  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('media_assets','media_asset_references','media_deletion_journal') AND k.conname <> 'host_profile_media_identity';
+  SELECT array_agg(c.relname||'|'||k.conname||'|'||pg_get_constraintdef(k.oid,true) ORDER BY c.relname,k.conname) INTO actual FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('media_assets','media_asset_references','media_deletion_journal') AND k.conname NOT IN ('host_profile_media_identity','community_media_identity');
   IF actual IS DISTINCT FROM ARRAY[
     'media_asset_references|media_asset_references_asset_id_fkey|FOREIGN KEY (asset_id) REFERENCES media_assets(id)',
     'media_asset_references|media_asset_references_pkey|PRIMARY KEY (asset_id, parent_type, parent_id)',
@@ -1351,7 +1376,7 @@ BEGIN
   IF to_regprocedure('private.prepare_support_message()') IS NULL
     OR to_regprocedure('private.advance_support_version()') IS NULL THEN RAISE EXCEPTION 'Missing Phase 1 safety functions'; END IF;
   SELECT array_agg(relname::text ORDER BY relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority');
+    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts');
   IF actual IS DISTINCT FROM ARRAY['admin_monitor_cutover']::text[] THEN RAISE EXCEPTION 'Private table inventory mismatch'; END IF;
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'private' AND tablename IN ('admin_monitor_cutover','phone_followup_tasks')) THEN RAISE EXCEPTION 'Private cutover policy exists'; END IF;
   SELECT array_agg(column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default,'') ORDER BY ordinal_position)
@@ -1374,7 +1399,7 @@ BEGIN
     CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END || '|' || a.privilege_type || '|' || a.is_grantable::text,
     E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
     INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority');
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts');
   IF fingerprint IS DISTINCT FROM 'c0c83ee9ce880c47d3d24f3f918b4364' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
 END $admin_attention_contract$;
 
@@ -1683,6 +1708,9 @@ BEGIN
   SELECT array_agg(c.relname::text ORDER BY c.relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relkind IN ('r','p');
   IF actual IS DISTINCT FROM ARRAY[
     'admin_monitor_cutover',
+    'community_media_authority',
+    'community_media_context',
+    'community_media_plan_receipts',
     'host_profile_auth_cas',
     'host_profile_operation_context',
     'host_profile_source_authority',
@@ -1691,7 +1719,7 @@ BEGIN
     RAISE EXCEPTION 'Private table inventory mismatch: %', actual;
   END IF;
   SELECT md5(string_agg(n.nspname||'|'||c.relname||'|'||c.relkind::text||'|'||CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable)) INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f');
-  IF fingerprint IS DISTINCT FROM 'ee6e712c55f00b284ed8a988b04b163d' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
+  IF fingerprint IS DISTINCT FROM '5c6eec1ba4930757fff2e15e64d79d30' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
   IF (SELECT count(*) FROM private.host_profile_source_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.host_profile_source_authority WHERE singleton AND r2_enabled) THEN RAISE EXCEPTION 'Production Host authority marker mismatch'; END IF;
 END $host_authority_production_contract$;
 
@@ -1714,6 +1742,31 @@ BEGIN
   SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261006133015';
   IF actual IS DISTINCT FROM ARRAY['20261006133015:admin_chat_canonical_recency:1:51c7ec1a33a61ffa757451d08e1d3358:e2a79488d8b24a5d923f9247d5331eb2f9de95436a6ec790bf81981c00d8a889']::text[] THEN RAISE EXCEPTION 'Recency applied ledger SQL mismatch: %', actual; END IF;
 END $admin_chat_recency_ledger_contract$;
+
+DO $community_authority_catalog_contract$
+DECLARE actual jsonb;
+BEGIN
+SELECT jsonb_build_object('observedAt',now(),'functions',(SELECT jsonb_agg(jsonb_build_object('identity',format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),'owner',pg_get_userbyid(p.proowner),'securityDefiner',p.prosecdef,'volatility',p.provolatile,'result',pg_get_function_result(p.oid),'configuration',p.proconfig,'acl',p.proacl::text,'bodyMd5',md5(p.prosrc)) ORDER BY n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private') AND p.proname LIKE '%community%' AND p.proname <> 'increment_community_post_view_count'),
+'constraints',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',k.conname,'definition',pg_get_constraintdef(k.oid,true)) ORDER BY n.nspname,c.relname,k.conname) FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (n.nspname='private' AND c.relname LIKE 'community_media%') OR k.conname='community_media_identity'),
+'triggers',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',t.tgname,'definition',pg_get_triggerdef(t.oid,true),'enabled',t.tgenabled) ORDER BY n.nspname,c.relname,t.tgname) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid WHERE NOT t.tgisinternal AND p.proname LIKE '%community%' AND p.proname <> 'increment_community_post_view_count'),
+'tables',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'owner',pg_get_userbyid(c.relowner),'rls',c.relrowsecurity,'forced',c.relforcerowsecurity,'acl',c.relacl::text) ORDER BY c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relname LIKE 'community_media%' AND c.relkind='r'),
+'columns',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'notNull',a.attnotnull,'default',coalesce(pg_get_expr(d.adbin,d.adrelid),'')) ORDER BY n.nspname,c.relname,a.attnum) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum WHERE ((n.nspname='private' AND c.relname LIKE 'community_media%') OR (n.nspname='public' AND c.relname='community_posts' AND a.attname='media_revision')) AND c.relkind IN ('r','p') AND a.attnum>0 AND NOT a.attisdropped),
+'indexes',(SELECT jsonb_agg(jsonb_build_object('schema',schemaname,'name',indexname,'definition',indexdef) ORDER BY schemaname,indexname) FROM pg_indexes WHERE schemaname='private' AND tablename LIKE 'community_media%'),
+'publicFunctionOverloads',(SELECT jsonb_agg(format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f'),
+'privateFunctionOverloads',(SELECT jsonb_agg(format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='private' AND p.prokind='f'),
+'counts',jsonb_build_object('publicColumns',(SELECT count(*) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') AND a.attnum>0 AND NOT a.attisdropped),'privateColumns',(SELECT count(*) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped),'publicConstraints',(SELECT count(*) FROM pg_constraint k JOIN pg_namespace n ON n.oid=k.connamespace WHERE n.nspname='public'),'privateConstraints',(SELECT count(*) FROM pg_constraint k JOIN pg_namespace n ON n.oid=k.connamespace WHERE n.nspname='private'),'publicIndexes',(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='i'),'privateIndexes',(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relkind='i')),
+'privateGrantsFingerprint',(SELECT md5(string_agg(n.nspname||'|'||c.relname||'|'||c.relkind::text||'|'||CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable)) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f'))) INTO actual;
+  actual := actual - ARRAY['observedAt','ledger','authority','publicFunctionOverloads','privateFunctionOverloads','counts','privateGrantsFingerprint'];
+  IF actual IS DISTINCT FROM '{"functions":[{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"boolean","bodyMd5":"b10a9930dda2b12286313ee3253df729","identity":"private.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"0c826dfc1f07f7030c87bbedd6cfa6c1","identity":"private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"31e3ce94bb542850fa8497455b3b66e8","identity":"private.community_media_backup_contract()","volatility":"s","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"ded8e352ea1fa10818b2056989623db1","identity":"private.community_media_migration_inventory()","volatility":"s","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres}","owner":"postgres","result":"trigger","bodyMd5":"fe7c590322943e625a11a41ca1651eee","identity":"private.guard_community_asset_identity()","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres}","owner":"postgres","result":"trigger","bodyMd5":"6000e9486a951caa7ea77c8e18c1ee50","identity":"private.guard_community_media_writer()","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres}","owner":"postgres","result":"trigger","bodyMd5":"e2b9ee3c13d2f7b04780f72415209ded","identity":"private.guard_community_physical_delete()","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres}","owner":"postgres","result":"trigger","bodyMd5":"c2dab573dca332131e2f28afdd6ae99c","identity":"private.guard_community_reference_zero_journal()","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"boolean","bodyMd5":"df4f50e676994beadbfc2a80f8019e04","identity":"private.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres}","owner":"postgres","result":"trigger","bodyMd5":"f3e9080a1b6efc3aba4008bc2f18cc6b","identity":"private.sync_community_media_assets()","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"boolean","bodyMd5":"d15ee5cbbf09013f6f7cdac684c6b9cf","identity":"public.apply_community_media_locators(p_plan_digest text, p_assets jsonb, p_posts jsonb, p_rollback boolean)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"media_assets","bodyMd5":"fad0aef82c25fdd1b02d5b90067def77","identity":"public.begin_community_media_asset(p_id uuid, p_owner_id uuid, p_key text, p_url text, p_sha256 text, p_size bigint, p_mime text, p_idempotency_key text)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"d43440ceb88aad5f42214ebce11d0f27","identity":"public.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"297e5d7f6e79ac13457906b60710a6cf","identity":"public.community_media_backup_contract()","volatility":"s","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"jsonb","bodyMd5":"17459653a37630c9c4e9960546be2aa2","identity":"public.community_media_migration_inventory()","volatility":"s","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"media_assets","bodyMd5":"18f96bb18e88c707f154021e4eaf8701","identity":"public.mark_community_media_uploaded(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"boolean","bodyMd5":"24cdde0fff781c1bca4bee566216b9b9","identity":"public.set_community_legacy_writer_freeze(p_frozen boolean, p_smoke_asset_id uuid, p_sha256 text)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"media_assets","bodyMd5":"ea2fc4f39dbb90497a7335d228e9e773","identity":"public.verify_community_media_asset(p_id uuid, p_owner_id uuid, p_sha256 text, p_size bigint, p_mime text)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":false}],"constraints":[{"name":"community_media_authority_pkey","table":"community_media_authority","schema":"private","definition":"PRIMARY KEY (singleton)"},{"name":"community_media_authority_singleton_check","table":"community_media_authority","schema":"private","definition":"CHECK (singleton)"},{"name":"community_media_context_pkey","table":"community_media_context","schema":"private","definition":"PRIMARY KEY (backend_id, transaction_id, post_id)"},{"name":"community_media_plan_receipts_pkey","table":"community_media_plan_receipts","schema":"private","definition":"PRIMARY KEY (plan_digest)"},{"name":"community_media_plan_receipts_plan_digest_check","table":"community_media_plan_receipts","schema":"private","definition":"CHECK (plan_digest ~ ''^[a-f0-9]{64}$''::text)"},{"name":"community_media_plan_receipts_state_check","table":"community_media_plan_receipts","schema":"private","definition":"CHECK (state = ANY (ARRAY[''applied''::text, ''rolled_back''::text]))"},{"name":"community_media_identity","table":"media_assets","schema":"public","definition":"CHECK (business_scope <> ''community''::text OR provider = ''r2''::text AND bucket = ''locally-public-community-originals''::text AND parent_type = ''community_owner''::text AND parent_id = owner_id::text AND expected_size <= 10485760 AND (mime = ANY (ARRAY[''image/jpeg''::text, ''image/png''::text, ''image/webp''::text, ''image/gif''::text, ''image/avif''::text])) AND object_key = ((((''community/v1/''::text || encode(sha256(convert_to(''community-media-owner:''::text || owner_id::text, ''UTF8''::name)), ''hex''::text)) || ''/''::text) || id::text) || ''/image''::text) AND public_url = (''https://community-media.locally-travel.com/''::text || object_key) AND public_url IS NOT NULL AND deleted_at IS NULL)"}],"triggers":[{"name":"a_community_media_writer","table":"community_posts","schema":"public","enabled":"O","definition":"CREATE TRIGGER a_community_media_writer BEFORE INSERT OR UPDATE ON community_posts FOR EACH ROW EXECUTE FUNCTION private.guard_community_media_writer()"},{"name":"community_media_delete_plan","table":"community_posts","schema":"public","enabled":"O","definition":"CREATE TRIGGER community_media_delete_plan BEFORE DELETE ON community_posts FOR EACH ROW EXECUTE FUNCTION private.sync_community_media_assets()"},{"name":"community_media_finalize","table":"community_posts","schema":"public","enabled":"O","definition":"CREATE TRIGGER community_media_finalize AFTER INSERT OR UPDATE OF images ON community_posts FOR EACH ROW EXECUTE FUNCTION private.sync_community_media_assets()"},{"name":"community_asset_identity_immutable","table":"media_assets","schema":"public","enabled":"O","definition":"CREATE TRIGGER community_asset_identity_immutable BEFORE UPDATE ON media_assets FOR EACH ROW EXECUTE FUNCTION private.guard_community_asset_identity()"},{"name":"community_physical_delete_disabled","table":"media_deletion_journal","schema":"public","enabled":"O","definition":"CREATE TRIGGER community_physical_delete_disabled BEFORE INSERT OR UPDATE ON media_deletion_journal FOR EACH ROW EXECUTE FUNCTION private.guard_community_physical_delete()"},{"name":"community_reference_zero_journal","table":"media_deletion_journal","schema":"public","enabled":"O","definition":"CREATE TRIGGER community_reference_zero_journal BEFORE INSERT ON media_deletion_journal FOR EACH ROW EXECUTE FUNCTION private.guard_community_reference_zero_journal()"},{"name":"community_legacy_storage_writer","table":"objects","schema":"storage","enabled":"O","definition":"CREATE TRIGGER community_legacy_storage_writer BEFORE INSERT OR DELETE OR UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION private.guard_community_media_writer()"}],"tables":[{"acl":"{postgres=arwdDxtm/postgres}","rls":true,"name":"community_media_authority","owner":"postgres","forced":false,"schema":"private"},{"acl":"{postgres=arwdDxtm/postgres}","rls":true,"name":"community_media_context","owner":"postgres","forced":false,"schema":"private"},{"acl":"{postgres=arwdDxtm/postgres}","rls":true,"name":"community_media_plan_receipts","owner":"postgres","forced":false,"schema":"private"}],"columns":[{"name":"singleton","type":"boolean","table":"community_media_authority","schema":"private","default":"true","notNull":true},{"name":"legacy_writes_frozen","type":"boolean","table":"community_media_authority","schema":"private","default":"false","notNull":true},{"name":"backend_id","type":"integer","table":"community_media_context","schema":"private","default":"","notNull":true},{"name":"transaction_id","type":"bigint","table":"community_media_context","schema":"private","default":"","notNull":true},{"name":"post_id","type":"uuid","table":"community_media_context","schema":"private","default":"","notNull":true},{"name":"rollback","type":"boolean","table":"community_media_context","schema":"private","default":"false","notNull":true},{"name":"plan_digest","type":"text","table":"community_media_plan_receipts","schema":"private","default":"","notNull":true},{"name":"payload","type":"jsonb","table":"community_media_plan_receipts","schema":"private","default":"","notNull":true},{"name":"state","type":"text","table":"community_media_plan_receipts","schema":"private","default":"","notNull":true},{"name":"created_at","type":"timestamp with time zone","table":"community_media_plan_receipts","schema":"private","default":"now()","notNull":true},{"name":"media_revision","type":"bigint","table":"community_posts","schema":"public","default":"0","notNull":true}],"indexes":[{"name":"community_media_authority_pkey","schema":"private","definition":"CREATE UNIQUE INDEX community_media_authority_pkey ON private.community_media_authority USING btree (singleton)"},{"name":"community_media_context_pkey","schema":"private","definition":"CREATE UNIQUE INDEX community_media_context_pkey ON private.community_media_context USING btree (backend_id, transaction_id, post_id)"},{"name":"community_media_plan_receipts_pkey","schema":"private","definition":"CREATE UNIQUE INDEX community_media_plan_receipts_pkey ON private.community_media_plan_receipts USING btree (plan_digest)"}]}'::jsonb THEN RAISE EXCEPTION 'Community catalog security or definition mismatch'; END IF;
+END $community_authority_catalog_contract$;
+
+DO $community_authority_production_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex')) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261006105322';
+  IF actual IS DISTINCT FROM ARRAY['20261006105322:community_media_authority:1:53e0523d80dfe4ce279fb98c548e7f58:55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912']::text[] THEN RAISE EXCEPTION 'Community applied ledger SQL mismatch'; END IF;
+  IF (SELECT count(*) FROM private.community_media_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.community_media_authority WHERE singleton AND legacy_writes_frozen=false) THEN RAISE EXCEPTION 'Production Community authority marker mismatch'; END IF;
+END $community_authority_production_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 
