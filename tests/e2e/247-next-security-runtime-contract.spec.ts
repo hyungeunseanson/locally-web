@@ -38,6 +38,12 @@ test.describe('patched Next.js runtime contract', () => {
     expect(nextConfig.images?.remotePatterns).toEqual([
       {
         protocol: 'https',
+        hostname: 'host-profile-media.locally-travel.com',
+        pathname: '/host-profiles/v1/**',
+        search: '',
+      },
+      {
+        protocol: 'https',
         hostname: 'avatars-media.locally-travel.com',
         pathname: '/avatars/v1/**',
         search: '',
