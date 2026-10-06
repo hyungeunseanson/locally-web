@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {mkdtemp,stat,readFile,rm,writeFile,symlink} from 'node:fs/promises';
 import os from 'node:os';
-import {planCommunityMigration,validateCommunityPlan,executeCommunityPlan,communityDigest,selectCommunitySources,assertCommunityCurrent} from './community-media-migration.mjs';
+import {planCommunityMigration,validateCommunityPlan,executeCommunityPlan,selectCommunitySources} from './community-media-migration.mjs';
 import {communityOperatorBinding,communityPrivateJson} from './community-media-operator.mjs';
 import {prepareCommunityCutoverConfig} from './prepare-community-cutover-config.mjs';
 import {COMMUNITY_LEGACY_BASE,COMMUNITY_BUCKET} from '../../app/utils/communityMediaContract.mjs';
