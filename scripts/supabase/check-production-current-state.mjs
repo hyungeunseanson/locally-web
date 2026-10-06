@@ -227,14 +227,14 @@ expectedLedger.splice(-1, 0, {
   "repositorySha256": "55ac4184288d9213e31b4f40de928d7ccfd4c02765db90c0d2d7f8858c597912",
   "repositoryVersion": "20261006105322"
 });
-const expectedPendingMigrations = [
-  {
-    "version": "20261006173453",
-    "name": "community_freeze_safeupdate",
-    "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
-    "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
-  }
-];
+expectedLedger.push({
+  "version": "20261006180321",
+  "name": "community_freeze_safeupdate",
+  "repositoryFile": "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
+  "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd",
+  "repositoryVersion": "20261006173453"
+});
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -371,7 +371,7 @@ assert(recencyIndex.valid && recencyIndex.ready && !recencyIndex.unique && !rece
   && contract.includes(recencyIndex.predicate.replaceAll("'", "''")), 'Recency index evidence differs');
 const recencyLedger = recency.ledgerEvidence[0];
 assert(recencyLedger.version === '20261006133015' && recencyLedger.statementCount === 1
-  && recencyLedger.statementsSha256 === expectedLedger.at(-1).repositorySha256
+  && recencyLedger.statementsSha256 === expectedLedger.find(e => e.version === '20261006133015').repositorySha256
   && contract.includes(`${recencyLedger.version}:${recencyLedger.name}:1:${recencyLedger.statementsMd5}:${recencyLedger.statementsSha256}`), 'Recency ledger evidence differs');
 const community = manifest.appliedCommunityAuthority;
 assert(community.functions.length === 18 && community.tables.length === 3 && community.columns.length === 11
@@ -379,6 +379,8 @@ assert(community.functions.length === 18 && community.tables.length === 3 && com
   && community.productionWrites === 0, 'Community catalog capture differs');
 assert(contract.includes('$community_authority_catalog_contract$') && contract.includes('$community_authority_production_contract$'), 'Community applied contracts missing');
 assert(contract.includes(JSON.stringify(Object.fromEntries(['functions','constraints','triggers','tables','columns','indexes'].map(k => [k,community[k]]))).replaceAll("'", "''")), 'Community catalog evidence differs');
+assert(JSON.stringify(community.authority) === JSON.stringify([{singleton:true,legacy_writes_frozen:true}]), 'Community freeze marker differs');
+assert(community.ledgerEvidence.length === 2 && community.ledgerEvidence[1].version === '20261006180321' && community.ledgerEvidence[1].statementsSha256 === expectedLedger.at(-1).repositorySha256, 'Community hotfix ledger evidence differs');
 const objects = manifest.objects;
 for (const [name, fingerprint] of Object.entries(expectedFingerprints)) {
   if (!name.startsWith('stagingOverlayTarget')) {
