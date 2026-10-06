@@ -13,11 +13,16 @@ import {
 import { getLegacyHubSeedForBoard, resolveCommunityBoard } from '@/app/community/boardMeta';
 import { getCommunityCategoryFromFormat } from '@/app/community/categoryMeta';
 import type { CommunityBoard, CommunityHub, CommunityPostFormat, CommunitySourceLocale } from '@/app/types/community';
+import { communityKey, COMMUNITY_BASE_URL, communityWriteAuthority } from '@/app/utils/communityMediaContract.mjs';
+import { loadCommunityRuntime } from '@/app/utils/communityMedia.server';
 import { cleanupOwnedCommunityImages, isOwnedCommunityImagePath } from '@/app/utils/communityImageCleanup';
 
 const MAX_COMMUNITY_POST_IMAGES = 1;
 
 async function cleanupUploadedImages(imagePaths: string[], ownerId: string, supabase: Awaited<ReturnType<typeof createClient>>) {
+    // During/after cutover every legacy byte is retained; no canonical provider delete.
+    try { if (communityWriteAuthority(loadCommunityRuntime(), process.env.COMMUNITY_R2_SOURCE_ENABLED) !== 'supabase') return; }
+    catch { return; }
     const supabaseAdmin = createAdminClient();
     const result = await cleanupOwnedCommunityImages(imagePaths, ownerId, {
         hasReferences: async path => {
@@ -66,6 +71,7 @@ export async function POST(request: NextRequest) {
             content,
             images,
             image_paths,
+            image_asset_ids,
             companion_date,
             companion_city,
             linked_exp_id,
@@ -77,6 +83,8 @@ export async function POST(request: NextRequest) {
         } = body;
         const normalizedImages = Array.isArray(images) ? images.filter((image): image is string => typeof image === 'string' && image.length > 0) : [];
         const normalizedImagePaths = Array.isArray(image_paths) ? image_paths.filter((imagePath): imagePath is string => typeof imagePath === 'string' && imagePath.length > 0) : [];
+        const normalizedAssetIds = Array.isArray(image_asset_ids) ? image_asset_ids.filter((id): id is string => typeof id === 'string') : [];
+        const r2Images = normalizedAssetIds.length > 0;
         const normalizedCompanionCity = typeof companion_city === 'string' ? companion_city.trim() : '';
         const normalizedBoard = typeof board_country === 'string' && allowedBoards.has(board_country)
             ? resolveCommunityBoard(board_country) as CommunityBoard
@@ -106,14 +114,26 @@ export async function POST(request: NextRequest) {
         if (normalizedImages.length > MAX_COMMUNITY_POST_IMAGES || normalizedImagePaths.length > MAX_COMMUNITY_POST_IMAGES) {
             return NextResponse.json({ error: '이미지는 최대 1장까지만 첨부할 수 있습니다.' }, { status: 400 });
         }
-        if (normalizedImages.length !== normalizedImagePaths.length) {
-            return NextResponse.json({ error: '이미지 정보가 올바르지 않습니다.' }, { status: 400 });
-        }
-        if (normalizedImagePaths.some((imagePath) => !isOwnedCommunityImagePath(imagePath, user.id))) {
-            return NextResponse.json({ error: '이미지 경로가 올바르지 않습니다.' }, { status: 400 });
-        }
-        if (normalizedImages.some((imageUrl, index) => imageUrl !== resolveExpectedCommunityImageUrl(normalizedImagePaths[index]))) {
-            return NextResponse.json({ error: '이미지 URL이 올바르지 않습니다.' }, { status: 400 });
+        if (r2Images) {
+            try {
+                if (communityWriteAuthority(loadCommunityRuntime(), process.env.COMMUNITY_R2_SOURCE_ENABLED) !== 'r2'
+                    || normalizedImagePaths.length || normalizedAssetIds.length !== normalizedImages.length
+                    || normalizedImages.some((url, index) => url !== COMMUNITY_BASE_URL + '/' + communityKey(user.id, normalizedAssetIds[index]))) {
+                    return NextResponse.json({ error: '이미지 정보가 올바르지 않습니다.' }, { status: 400 });
+                }
+            } catch { return NextResponse.json({ error: 'community_r2_unavailable' }, { status: 503 }); }
+            // DB trigger owns verified/owner checks and reference attachment atomically with INSERT.
+        } else {
+            if (normalizedImages.length) {
+                try {
+                    if (communityWriteAuthority(loadCommunityRuntime(), process.env.COMMUNITY_R2_SOURCE_ENABLED) !== 'supabase') return NextResponse.json({ error: 'community_legacy_write_disabled' }, { status: 409 });
+                } catch { return NextResponse.json({ error: 'community_r2_unavailable' }, { status: 503 }); }
+            }
+            if (normalizedImages.length !== normalizedImagePaths.length
+                || normalizedImagePaths.some((path) => !isOwnedCommunityImagePath(path, user.id))
+                || normalizedImages.some((url, index) => url !== resolveExpectedCommunityImageUrl(normalizedImagePaths[index]))) {
+                return NextResponse.json({ error: '이미지 정보가 올바르지 않습니다.' }, { status: 400 });
+            }
         }
         // [Security] 제목/본문 길이 제한 — DB overflow 및 이메일 페이로드 블로팅 방지
         if (title.trim().length > 200) {

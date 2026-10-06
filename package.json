@@ -126,7 +126,10 @@
     "storage:avatar:contract": "node scripts/supabase/test-avatar-media-authority.mjs && node --test tests/unit/avatar-media.test.mjs scripts/cloudflare/avatar-media-migration.test.mjs",
     "storage:host-profile:contract": "node scripts/supabase/test-host-profile-media-authority.mjs && node --test tests/unit/host-profile-media.test.mjs tests/integration/host-profile-save.test.mjs scripts/cloudflare/host-profile-media-migration.test.mjs && PYTHONPATH=scripts/backup python3 -m unittest storage_host_profile_source_test",
     "storage:host-profile:runtime": "node scripts/cloudflare/test-host-profile-media-runtime.mjs",
-    "storage:host-profile:native": "node scripts/supabase/test-host-profile-media-native.mjs"
+    "storage:host-profile:native": "node scripts/supabase/test-host-profile-media-native.mjs",
+    "storage:community:contract": "node --test tests/unit/community-media.test.mjs tests/unit/community-post-media.test.mjs scripts/cloudflare/community-media-migration.test.mjs && PYTHONPATH=scripts/backup python3 -m unittest storage_community_source_test",
+    "storage:community:runtime": "node scripts/cloudflare/test-community-media-runtime.mjs && node scripts/cloudflare/test-community-readers-runtime.mjs",
+    "storage:community:native": "node scripts/supabase/test-community-media-native.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

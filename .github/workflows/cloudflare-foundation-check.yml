@@ -124,10 +124,24 @@ jobs:
         run: npm run storage:host-profile:runtime
 
       - name: Install isolated native PostgreSQL 17 fixture
-        run: npm install --prefix "$RUNNER_TEMP/host-pg17" --no-audit --no-fund embedded-postgres@17.6.0-beta.15 pg@8.16.3
+        run: npm install --prefix "$RUNNER_TEMP/host-pg17" --no-audit --no-fund embedded-postgres@17.6.0-beta.15 pg@8.16.3 esbuild@0.25.4
 
       - name: Validate Host source authority on native PostgreSQL 17
         run: HOST_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run storage:host-profile:native
+
+      - name: Validate Community immutable originals, operator and backup boundaries
+        run: npm run storage:community:contract
+
+      - name: Validate Community upload and full raster decode on local workerd and R2
+        run: npm run storage:community:runtime
+
+      - name: Validate Community image-set CAS on native PostgreSQL 17
+        run: COMMUNITY_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run storage:community:native
+
+      - name: Validate Financial P0 on native PostgreSQL 17 and NICEPAY ACK
+        run: |
+          SOLO_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run test:solo-guarantee-p0:native
+          node --test tests/unit/nicepay-solo-refund-notification.test.mjs
 
       - name: Validate Storage byte backup and lifecycle foundation
         run: npm run storage:foundation:contract

@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
+import { uploadCommunityImage } from '@/app/utils/communityImageUpload';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react';
@@ -15,7 +17,8 @@ import { buildCommunityBoardDetailHref, buildCommunityBoardListHref } from '../q
 const MAX_IMAGES = 1;
 
 type UploadedImage = {
-  path: string;
+  path?: string;
+  assetId?: string;
   publicUrl: string;
 };
 
@@ -102,27 +105,31 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
 
   const uploadImages = async (): Promise<UploadedImage[]> => {
     const uploadedImages: UploadedImage[] = [];
+    if (!imageFiles.length) return uploadedImages;
+    // Server selects authority at request time; no build-time/browser flag drift.
+    const authorityResponse = await fetch('/api/community/images', { cache: 'no-store', credentials: 'same-origin' });
+    const selection = await authorityResponse.json();
+    if (!authorityResponse.ok || !['supabase', 'r2'].includes(selection.authority)) throw new Error('이미지 업로드를 준비하지 못했습니다.');
 
     for (const file of imageFiles) {
       const compressed = asProcessedImageFile(await compressImage(file));
-      const fileName = sanitizeFileName(compressed.name);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('로그인이 필요합니다.');
-      const filePath = `community/${user.id}/${Date.now()}-${fileName}`;
-      const { error } = await supabase.storage
-        .from('images')
-        .upload(filePath, compressed, { cacheControl: '3600', upsert: false });
+      uploadedImages.push(await uploadCommunityImage(compressed, selection.authority, async (legacyFile) => {
+        const fileName = sanitizeFileName(legacyFile.name);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('로그인이 필요합니다.');
+        const filePath = `community/${user.id}/${Date.now()}-${fileName}`;
+        const { error } = await supabase.storage
+          .from('images')
+          .upload(filePath, legacyFile, { cacheControl: '3600', upsert: false });
 
-      if (error) {
-        console.error('Community image upload failed:', error);
-        throw new Error('이미지 업로드에 실패했습니다.');
-      }
+        if (error) {
+          console.error('Community image upload failed:', error);
+          throw new Error('이미지 업로드에 실패했습니다.');
+        }
 
-      const { data } = supabase.storage.from('images').getPublicUrl(filePath);
-      uploadedImages.push({
-        path: filePath,
-        publicUrl: data.publicUrl,
-      });
+        const { data } = supabase.storage.from('images').getPublicUrl(filePath);
+        return { path: filePath, publicUrl: data.publicUrl };
+      }));
     }
 
     return uploadedImages;
@@ -144,7 +151,8 @@ export default function PostEditor({ initialBoard, initialLocale }: PostEditorPr
           title,
           content,
           images: uploadedImages.map((image) => image.publicUrl),
-          image_paths: uploadedImages.map((image) => image.path),
+          image_paths: uploadedImages.flatMap((image) => image.path ? [image.path] : []),
+          image_asset_ids: uploadedImages.flatMap((image) => image.assetId ? [image.assetId] : []),
           is_anonymous: isAnonymous,
         }),
       });
