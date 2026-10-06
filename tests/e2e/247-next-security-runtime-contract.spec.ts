@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+import { hasRemoteMatch } from 'next/dist/shared/lib/match-remote-pattern';
 import nextConfig from '../../next.config';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -38,6 +39,12 @@ test.describe('patched Next.js runtime contract', () => {
     expect(nextConfig.images?.remotePatterns).toEqual([
       {
         protocol: 'https',
+        hostname: 'community-media.locally-travel.com',
+        pathname: '/community/v1/**',
+        search: '',
+      },
+      {
+        protocol: 'https',
         hostname: 'host-profile-media.locally-travel.com',
         pathname: '/host-profiles/v1/**',
         search: '',
@@ -62,6 +69,12 @@ test.describe('patched Next.js runtime contract', () => {
         pathname: '/storage/v1/object/public/**',
       },
     ]);
+    const communityUrl = 'https://community-media.locally-travel.com/community/v1/' + 'a'.repeat(64) + '/11111111-1111-4111-8111-111111111111/image';
+    const patterns = nextConfig.images?.remotePatterns ?? [];
+    expect(hasRemoteMatch([], patterns, new URL(communityUrl))).toBe(true);
+    for (const url of [communityUrl.replace('https:', 'http:'), communityUrl + '?capability=fixture', communityUrl.replace('/community/v1/', '/avatars/v1/')]) {
+      expect(hasRemoteMatch([], patterns, new URL(url))).toBe(false);
+    }
   });
 
   test('preserves representative redirect and rewrite behavior', async () => {
