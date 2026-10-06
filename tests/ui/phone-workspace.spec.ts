@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 import { build } from 'esbuild';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
@@ -461,7 +461,20 @@ test('phone reply sends exact rendered snapshot with no completion or participan
 // Same starting-main source and current source, same real component fixture.
 test('phone workload benchmark: idle ten minutes, one INSERT, ten INSERT burst, recomplete',async({page})=>{
   await page.clock.install();
+  // Request arrival is earlier than response application. Keep each measured
+  // workload separate so the previous one cannot leak into the next counters.
+  const inFlight = new Set<Request>();
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.startsWith('/api/')) inFlight.add(request);
+  });
+  page.on('requestfinished', request => inFlight.delete(request));
+  page.on('requestfailed', request => inFlight.delete(request));
   const state=await fixture(page,{status:'COMPLETED'});
+  const settle = async () => {
+    await expect.poll(() => inFlight.size).toBe(0);
+    await expect(page.getByTestId('admin-phone-reservation-refresh-button')).toBeEnabled();
+    await expect(composer(page)).toBeEnabled();
+  };
   await expect(composer(page)).toBeEnabled();
   const metrics=()=>({list:state.reads.filter(p=>p.startsWith('/api/admin/customer-support?filter=')).length,
     detail:state.reads.filter(p=>p.includes('customer-support?requestId=')).length,
@@ -472,26 +485,32 @@ test('phone workload benchmark: idle ten minutes, one INSERT, ten INSERT burst, 
   await expect.poll(()=>state.reads.filter(p=>p.includes('customer-support')).length).toBe(4);
   await expect(composer(page)).toBeEnabled();
   await page.clock.runFor(1000);
+  await settle();
   const initial=metrics();state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
   await page.clock.runFor(600_000);await expect.poll(()=>state.reads.length).toBeGreaterThanOrEqual(4);
+  await settle();
   const idle=metrics();
   const activity=async(count:number,base:number)=>{
     state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
     const rows=Array.from({length:count},(_,n)=>({id:base+n,sender_id:'guest',content:`fixture ${base+n}`,type:'text',created_at:'2026-10-02T10:00:00Z',sender:{name:'고객'}}));
     state.messages.push(...rows);
     await page.evaluate(rows=>{for(const row of rows)(window as unknown as {emitDatabaseChange:(t:string,e:string,r:unknown)=>void}).emitDatabaseChange('inquiry_messages','INSERT',{...row,inquiry_id:123});},rows);
-    await page.clock.runFor(1000);await expect.poll(()=>state.reads.filter(p=>p.includes('customer-support')).length).toBe(2);return metrics();
+    await page.clock.runFor(1000);await expect.poll(()=>state.reads.filter(p=>p.includes('customer-support')).length).toBe(2);
+    await expect.poll(()=>state.messageRequests.length).toBeGreaterThanOrEqual(1);
+    await settle();
+    await expect(page.getByText(rows.at(-1)!.content, { exact: true })).toBeVisible();
+    return metrics();
   };
   const one=await activity(1,10),burst=await activity(10,20);
   state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
   let recomplete:ReturnType<typeof metrics>|null=null;
   if(process.env.PHONE_RECOMPLETE_BASELINE!=='1'){
-    await complete(page);await expect.poll(()=>state.reads.length).toBe(2);recomplete=metrics();
+    await complete(page);await expect.poll(()=>state.reads.length).toBe(2);await settle();recomplete=metrics();
     expect(recomplete.mutations).toBe(1);expect(recomplete.thread).toBe(0);
   }
   state.reads.length=0;state.messageRequests.length=0;state.calls.length=0;
   await composer(page).fill('benchmark reply');await send(page).click();await expect(composer(page)).toHaveValue('');
-  await page.clock.runFor(1000);const reply=metrics();expect(reply.mutations).toBe(1);
+  await page.clock.runFor(1000);await settle();const reply=metrics();expect(reply.mutations).toBe(1);
   console.log('PHONE_WORKLOAD',JSON.stringify({reply,source:process.env.PHONE_RECOMPLETE_BASELINE?'starting-main':'current',initial,idle,one,burst,recomplete}));
   expect(one.thread).toBeGreaterThanOrEqual(1);expect(burst.thread).toBeGreaterThanOrEqual(1);expect(idle.list).toBe(2);expect(idle.detail).toBe(2);
 });
