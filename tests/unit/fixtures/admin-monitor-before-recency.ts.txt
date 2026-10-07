@@ -1,7 +1,7 @@
 'use client';
 
 import { appendChatOperationsFilters, EMPTY_CHAT_OPERATIONS, type ChatOperationsFilters } from '@/app/utils/adminChatOperations';
-import { compareCanonicalInquiries, newerCanonicalActivity } from '@/app/utils/adminCanonicalRecency';
+import { activityMicros, compareCanonicalInquiries, newerCanonicalActivity } from '@/app/utils/adminCanonicalRecency';
 import { useAdminChatSync } from './useAdminChatSync';
 import type { PhoneReplySnapshot } from '@/app/utils/phoneFollowup';
 
@@ -88,8 +88,17 @@ function normalizeServerMessage(message: MonitorMessage): MonitorMessage {
   };
 }
 
+function isAdminSupportType(type?: string | null) {
+  return type === 'admin' || type === 'admin_support';
+}
+
 function sortMonitorInquiries(items: MonitorInquiry[]) {
-  return [...items].sort(compareCanonicalInquiries);
+  return [...items].sort((a, b) => {
+    if (isAdminSupportType(a.type) && isAdminSupportType(b.type)) return compareCanonicalInquiries(a, b);
+    const aTime = activityMicros(a.last_message_at || a.updated_at);
+    const bTime = activityMicros(b.last_message_at || b.updated_at);
+    return aTime === bTime ? 0 : aTime > bTime ? -1 : 1;
+  });
 }
 
 function mergeMonitorInquiry(
@@ -153,8 +162,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   const { onSubscription, onSuccess, onFailure } = sync;
   const { unseen, needsReply, reopened } = operations;
   const [inquiries, setInquiries] = useState<MonitorInquiry[]>([]);
-  const [resolvedInquiry, setResolvedInquiry] = useState<MonitorInquiry | null>(null);
-  const resolvedInquiryRef = useRef<MonitorInquiry | null>(null);
   const [selectedInquiry, setSelectedInquiry] = useState<MonitorInquiry | null>(null);
   const [messages, setMessages] = useState<MonitorMessage[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -264,7 +271,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       const requestedPages = pagesRef.current + (more ? 1 : 0);
       const nextInquiries: MonitorInquiry[] = [];
       let nextHasMore = false;
-      let nextResolved: MonitorInquiry | null = null;
       for (let page = 0; page < requestedPages; page += 1) {
         const params = new URLSearchParams({ view, offset: String(page * 50), limit: '50' });
         if (view === 'support' && statusFilter !== 'ALL') params.set('status', statusFilter);
@@ -278,14 +284,12 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           throw new Error(result.error || '목록을 불러오지 못했습니다.');
         }
 
-        if (page === 0 && view === 'monitor') nextResolved = result.resolvedInquiry ?? null;
         nextInquiries.push(...(Array.isArray(result.data) ? result.data as MonitorInquiry[] : []));
         nextHasMore = Boolean(result.pagination?.hasMore);
         if (!nextHasMore) break;
       }
       if (requestVersion !== inquiryRequestVersionRef.current) return;
       onSuccess();
-      if (view === 'monitor') { resolvedInquiryRef.current = nextResolved; setResolvedInquiry(nextResolved); }
       pagesRef.current = requestedPages;
       setHasMore(nextHasMore);
       const existing = new Map(inquiriesRef.current.map(row => [String(row.id), row]));
@@ -351,17 +355,20 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   }, [fetchInquiries, conversationOnly, enabled]);
 
   const invalidateMessageRecency = useCallback((row: InquiryMessageRealtimeRow) => {
-    if (row.id == null || row.inquiry_id == null || deletedMessageIdsRef.current.has(String(row.id)) || recencyReceiptsRef.current.has(`deleted:${row.id}`) || ![null, undefined, 'text', 'image'].includes(row.type)) return;
+    if (row.id == null || row.inquiry_id == null || ![null, undefined, 'text', 'image'].includes(row.type)) return;
     const key = `insert:${row.id}`;
     if (recencyReceiptsRef.current.has(key)) return;
     recencyReceiptsRef.current.add(key);
     if (recencyReceiptsRef.current.size > 500) recencyReceiptsRef.current.delete(recencyReceiptsRef.current.values().next().value!);
     const loaded = inquiriesRef.current.find(inquiry => String(inquiry.id) === String(row.inquiry_id));
     if (loaded && row.created_at) {
-      const canonical = newerCanonicalActivity(loaded.canonical_activity_at ?? loaded.created_at, row.created_at);
-      patchInquiry(row.inquiry_id, { canonical_activity_at: canonical });
+      const timestamp = isAdminSupportType(loaded.type) ? loaded.canonical_activity_at ?? loaded.created_at : loaded.last_message_at;
+      const canonical = newerCanonicalActivity(timestamp, row.created_at);
+      patchInquiry(row.inquiry_id, isAdminSupportType(loaded.type)
+        ? { canonical_activity_at: canonical }
+        : { last_message_at: canonical });
     }
-    if ((view === 'monitor' && (!loaded || inquiryFlightRef.current)) || (!attention && view !== 'monitor') || (view === 'support' && (!loaded || statusFilter !== 'ALL' || unseen || needsReply || reopened || inquiryFlightRef.current))) {
+    if (!attention || (view === 'support' && (!loaded || statusFilter !== 'ALL' || unseen || needsReply || reopened || inquiryFlightRef.current))) {
       scheduleFetchInquiries();
     }
   }, [attention, patchInquiry, scheduleFetchInquiries, view, statusFilter, unseen, needsReply, reopened]);
@@ -382,7 +389,6 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
 
     if (shouldSelect) {
       const selectedFromList = inquiriesRef.current.find((inquiry) => String(inquiry.id) === targetId)
-        ?? (view === 'monitor' && String(resolvedInquiryRef.current?.id) === targetId ? resolvedInquiryRef.current : null)
         ?? (conversationOnly ? { id: inquiryId, user_id: '' } : null);
       if (!selectedFromList) return false;
 
@@ -473,7 +479,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
         setIsMessagesLoading(false);
       }
     }
-  }, [patchInquiry, showToast, conversationOnly, view, attention, onSuccess, onFailure]);
+  }, [patchInquiry, showToast, conversationOnly, attention, onSuccess, onFailure]);
 
   useEffect(() => {
     const captured = renderedSnapshotRef.current;
@@ -511,20 +517,17 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
   useEffect(() => {
     if (!attention || !enabled) return;
     const observedVersions = new Map<string, number>();
-    const observedMonitorTimes = new Map(Object.values(attention.getSnapshot().conversations).map(row => [String(row.inquiry_id), row.last_message_at]));
     return attention.subscribe(() => {
       const rows = Object.values(attention.getSnapshot().conversations);
       for (const activity of rows) {
         if (inquiriesRef.current.some(row => String(row.id) === String(activity.inquiry_id))) {
           patchInquiry(activity.inquiry_id, { ...activity, content: activity.last_message_content });
-        } else if (!conversationOnly && activity.surface === view
-          && (view === 'support' || activity.last_message_at !== observedMonitorTimes.get(String(activity.inquiry_id)))
+        } else if (!conversationOnly && activity.surface === view && (view === 'support' || Number(activity.admin_unread_count) > 0)
           && attention.version(String(activity.inquiry_id)) > (observedVersions.get(String(activity.inquiry_id)) ?? 0)) {
           observedVersions.set(String(activity.inquiry_id), attention.version(String(activity.inquiry_id)));
           // A genuinely new conversation needs its participant metadata once.
           scheduleFetchInquiries();
         }
-        observedMonitorTimes.set(String(activity.inquiry_id), activity.last_message_at);
       }
     });
   }, [attention, enabled, patchInquiry, conversationOnly, view, scheduleFetchInquiries]);
@@ -874,8 +877,7 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
           const newPayload = payload.new as InquiryRealtimeRow | null;
           if (!newPayload?.id) return;
           // 문의 상태 변경, 내용 업데이트 시
-          if (view === 'monitor') patchInquiry(newPayload.id, newPayload);
-          else if (!attention) scheduleFetchInquiries();
+          if (!attention) scheduleFetchInquiries();
           // 열려있는 문의가 업데이트 된 경우 객체 갱신
           if (selectedInquiryRef.current && String(newPayload.id) === String(selectedInquiryRef.current.id)) {
              const nextSelected = mergeMonitorInquiry(selectedInquiryRef.current, newPayload);
@@ -904,13 +906,12 @@ export function useAdminChatQuery({ view = 'support', conversationOnly = false, 
       onSubscription('CLOSED');
       supabase.removeChannel(channel);
     };
-  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view, attention, onSubscription, patchInquiry]);
+  }, [supabase, currentUser, loadMessages, scheduleFetchInquiries, enabled, conversationOnly, view, attention, onSubscription]);
 
   return {
     sync,
     inquiries,
     selectedInquiry,
-    resolvedInquiry,
     messages,
     isLoading,
     error,

@@ -8,13 +8,13 @@ let script: string;
 let css: string;
 test.beforeAll(async () => {
   const bundle = await build({
-    stdin: { contents: "import React from 'react'; import {createRoot} from 'react-dom/client'; import ChatMonitor from './app/admin/dashboard/components/ChatMonitor'; createRoot(document.getElementById('root')).render(<ChatMonitor/>);", loader: 'tsx', resolveDir: process.cwd() },
+    stdin: { contents: "import React from 'react'; import {createRoot} from 'react-dom/client'; import ChatMonitor from './app/admin/dashboard/components/ChatMonitor'; createRoot(document.getElementById('root')).render(<ChatMonitor view={window.fixtureView || 'support'}/>);", loader: 'tsx', resolveDir: process.cwd() },
     bundle: true, write: false, format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"test"' },
     plugins: [{ name: 'local-admin-boundaries', setup(builder) {
       builder.onResolve({ filter: /^(next\/navigation|next\/image|@\/app\/utils\/supabase\/client|@\/app\/context\/ToastContext)$/ }, args => ({ path: args.path, namespace: 'fixture' }));
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => {
         let contents = '';
-        if (args.path === 'next/navigation') contents = "const router={push(){},replace(){}}; const params=new URLSearchParams(); export const useRouter=()=>router; export const usePathname=()=>'/admin/dashboard'; export const useSearchParams=()=>params;";
+        if (args.path === 'next/navigation') contents = "const router={push(){},replace(){}}; const params=new URLSearchParams(window.location.search); export const useRouter=()=>router; export const usePathname=()=>'/admin/dashboard'; export const useSearchParams=()=>params;";
         else if (args.path === 'next/image') contents = "import React from 'react'; export default function Image({unoptimized,...props}) {return React.createElement('img',props)}";
         else if (args.path.includes('ToastContext')) contents = "const showToast=()=>{}; export const useToast=()=>({showToast});";
         else contents = "const client={auth:{getUser:async()=>({data:{user:{id:'admin'}}})},channel:()=>{const c={on:()=>c,subscribe:()=>c};return c},removeChannel:()=>{}};export const createClient=()=>client;";
@@ -65,3 +65,36 @@ for (const width of [390, 1280]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   });
 }
+
+
+test('Monitor off-page URL opens detail while canonical page/policy membership stays bounded', async ({ page }) => {
+  const makeRow = (id: number) => ({ id: String(id), type: 'general', user_id: 'guest', host_id: 'host',
+    guest: { name: `Guest ${id}` }, host: { name: 'Public Host' }, content: `Preview ${id}`,
+    created_at: '2025-01-01T00:00:00Z', canonical_activity_at: '2026-10-06T12:00:00Z',
+    has_policy_signal: id === 75, policy_signal_categories: id === 75 ? ['external_contact'] : [] });
+  const rows = Array.from({ length: 50 }, (_, n) => makeRow(75 - n));
+  const target = makeRow(1), calls: string[] = [];
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url()); calls.push(url.pathname + url.search);
+    if (url.hostname !== 'admin-chat.test') return route.abort();
+    if (url.pathname === '/api/admin/inquiries') return route.fulfill({ json: { success: true, data: rows, resolvedInquiry: target, selection: { view: 'monitor' }, pagination: { hasMore: true } } });
+    if (url.pathname === '/api/admin/inquiries/1/messages') return route.fulfill({ json: { success: true, inquiry: target,
+      data: [{ id: 10, inquiry_id: 1, sender_id: 'guest', content: 'Off-page policy detail', type: 'text', created_at: '2026-10-06T12:00:00Z', has_policy_signal: true, policy_signal_categories: ['external_contact'] }] } });
+    if (url.pathname.endsWith('/ack')) return route.fulfill({ json: { success: true } });
+    if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: `<style>${css}</style><div id="root" style="height:800px"></div><script>window.fixtureView='monitor'</script>` });
+    return route.abort();
+  });
+  await page.goto('http://admin-chat.test/?view=monitor&inquiryId=1');
+  await page.addScriptTag({ content: script });
+  await expect(page.getByTestId('admin-chat-identity')).toContainText('Guest 1');
+  await expect(page.getByTestId('admin-chat-message-list')).toContainText('Off-page policy detail');
+  await expect(page.getByTestId('admin-chat-message-policy-badge')).toBeVisible();
+  await expect(page.getByTestId('admin-chat-list-policy-badge')).toHaveCount(1);
+  await expect(page.getByTestId('admin-chat-inquiry-row-1')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="admin-chat-inquiry-row-"]')).toHaveCount(50);
+  await expect(page.locator('[data-participant-card="host"]')).toContainText('Public Host');
+  await expect(page.getByTestId('admin-chat-search')).toHaveCount(0);
+  await expect(page.getByTestId('admin-chat-status-controls')).toHaveCount(0);
+  expect(calls.filter(url => url.startsWith('/api/admin/inquiries?'))).toHaveLength(1);
+  expect(calls).not.toContain('/api/inquiries/read');
+});

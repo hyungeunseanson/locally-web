@@ -89,6 +89,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     sync,
     inquiries,
     selectedInquiry,
+    resolvedInquiry,
     messages,
     loadMessages,
     selectInquiry,
@@ -196,9 +197,8 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
       if (String(selectedInquiry?.id ?? '') !== targetId) void selectInquiry(targetId);
       return;
     }
-    if (!inquiries?.length) return;
-
-    const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId));
+    const target = inquiries.find((inq: MonitorInquiry) => String(inq.id) === String(targetInquiryId))
+      ?? (view === 'monitor' && String(resolvedInquiry?.id) === targetId ? resolvedInquiry : null);
     if (!target) return;
 
     if (pendingUrlSelectionIdRef.current === targetId) {
@@ -210,7 +210,7 @@ export default function ChatMonitor({ view = 'support', enabled = true, phoneCon
     if (String(selectedInquiry?.id ?? '') !== targetId) {
       void selectInquiry(target.id);
     }
-  }, [enabled, phoneMode, clearSelected, targetInquiryId, inquiries, selectInquiry, selectedInquiry?.id]);
+  }, [enabled, phoneMode, clearSelected, targetInquiryId, inquiries, resolvedInquiry, view, selectInquiry, selectedInquiry?.id]);
 
   const navigateInquiryInUrl = useCallback((inquiryId?: number | string) => {
     const nextParams = new URLSearchParams(searchParams.toString());

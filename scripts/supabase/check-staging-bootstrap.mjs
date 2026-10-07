@@ -75,9 +75,10 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261006013755_host_profile_media_authority.sql',
   'supabase/migrations/20261006105322_community_media_authority.sql',
   'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
+  'supabase/migrations/20261006173453_community_freeze_safeupdate.sql',
 ];
-const expectedPendingOrder = [];
-const expectedApplyOrder = [...expectedAppliedOrder];
+const expectedPendingOrder = ['supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql'];
+const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
   'pending Production migrations',
@@ -195,3 +196,10 @@ if (!recencyAssertions || !schemaContract.includes(recencyAssertions)
 
 const communityAssertions = currentContract.match(/DO \$community_authority_catalog_contract\$[\s\S]*?\$community_authority_catalog_contract\$;/)?.[0];
 if (!communityAssertions || !schemaContract.includes(communityAssertions) || schemaContract.includes("$community_authority_production_contract$")) fail("Community staging/catalog separation differs");
+
+const monitorTarget = await readFile(resolve(root, 'supabase/staging/admin-monitor-recency-target-contract.sql'), 'utf8');
+const monitorAssertions = monitorTarget.match(/DO \$admin_monitor_recency_target_contract\$[\s\S]*?\$admin_monitor_recency_target_contract\$;/)?.[0];
+if (!monitorAssertions || !schemaContract.includes(monitorAssertions) || currentContract.includes(monitorAssertions)
+  || !monitorTarget.startsWith('-- Fresh-project target') || !monitorTarget.includes('BEGIN READ ONLY;') || !monitorTarget.trimEnd().endsWith('ROLLBACK;')) {
+  fail('pending Monitor target must remain separate from applied Production evidence');
+}

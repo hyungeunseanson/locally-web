@@ -105,6 +105,7 @@ test('DB/API truth: valid phone is distinct, anchors/duplicate/wrong-user links 
       INSERT INTO inquiry_messages(inquiry_id,sender_id,content) SELECT 2,'${guest}','question' FROM generate_series(1,10);
       INSERT INTO inquiry_messages(inquiry_id,sender_id,content) VALUES(3,'${guest}','legacy'),(1,'${host}','new monitor');`);
     const rpc = async (name, args) => {
+      if (name === 'list_admin_monitor_recency') return {data:(await db.query("SELECT id::text,updated_at AS canonical_activity_at FROM inquiries WHERE type IS NULL OR type NOT IN ('admin','admin_support') ORDER BY id LIMIT $1 OFFSET $2",[args.p_limit,args.p_offset])).rows};
       if (name === 'list_admin_support_recency') return {data:(await db.query("SELECT id::text,updated_at AS canonical_activity_at FROM inquiries WHERE type IN ('admin','admin_support') ORDER BY id LIMIT $1 OFFSET $2",[args.p_limit,args.p_offset])).rows};
       if (name === 'list_admin_phone_recency') return {data:(await db.query("SELECT id,now() AS canonical_activity_at FROM proxy_requests WHERE form_data->>'__proxy_card_anchor' IS DISTINCT FROM 'v1' ORDER BY id LIMIT $1 OFFSET $2",[args.p_limit,args.p_offset])).rows};
       const statement = name === 'get_admin_attention' ? 'SELECT get_admin_attention($1::bigint[]) result' : 'SELECT * FROM get_admin_inquiry_activity($1::bigint[])';

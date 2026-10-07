@@ -89,6 +89,7 @@ jobs:
       # All I/O is mocked. This job has no application server or service secrets.
       - run: npx tsc --noEmit
       - run: npm run test:admin-chat:search
+      - run: npm run test:admin-chat:recency
       - run: npm run test:admin-chat:operations
       - run: npm run test:admin-chat:phase1
       - run: npm run test:admin-attention:phase2

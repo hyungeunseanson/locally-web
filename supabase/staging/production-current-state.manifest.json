@@ -1306,7 +1306,14 @@
     "resultLimit": 25,
     "lockTimeout": "2s"
   },
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261007024725",
+      "name": "admin_chat_monitor_canonical_recency",
+      "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
+      "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
+    }
+  ],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"
