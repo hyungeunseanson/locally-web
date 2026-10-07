@@ -13,7 +13,7 @@ const expectedFingerprints = {
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-  privateRelationGrants: '5c6eec1ba4930757fff2e15e64d79d30',
+  privateRelationGrants: 'e12cdc9aaf5993e6c3a6997471907894',
   stagingOverlayBaselineStoragePolicies: 'd6b381fd629405acfdd615593031de5c',
   stagingOverlayTargetStorageBuckets: 'c3ff5767c8e4934ae05b3d96550441c8',
   stagingOverlayTargetStoragePolicies: '38c973a52a0bebe8fa78b3f53089e427',
@@ -241,14 +241,15 @@ expectedLedger.push({
   "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26",
   "repositoryVersion": "20261007024725"
 });
-const expectedPendingMigrations = [
-  {
-    "version": "20261007052144",
-    "name": "solo_refund_provider_ledger_reconciliation",
-    "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
-    "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
-  }
-];
+expectedLedger.push({
+  "version": "20261007061059",
+  "name": "solo_refund_provider_ledger_reconciliation",
+  "repositoryVersion": "20261007052144",
+  "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
+  "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a",
+  "ledgerStatementsSha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
+});
+const expectedPendingMigrations = [];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
@@ -297,8 +298,8 @@ assert(JSON.stringify(manifest.pendingProductionMigrations) === JSON.stringify(e
 assert(manifest.source.captureSql === 'supabase/staging/production-current-state.capture.sql'
   && manifest.source.postgresMajor === 17 && manifest.source.containsRows === false
   && manifest.source.containsStorageObjects === false, 'read-only capture provenance differs');
-assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 8
-  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 8
+assert((capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm) ?? []).length === 9
+  && (capture.match(/^ROLLBACK;$/gm) ?? []).length === 9
   && !/^\s*(?:INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|ALTER\s+|CREATE\s+|DROP\s+|TRUNCATE\s+)/gim.test(capture),
   'current-state capture must use only read-only transactions');
 assert(JSON.stringify(manifest.selectiveProductionRollout) === JSON.stringify(required.selectiveProductionRollout)
@@ -406,7 +407,7 @@ assert(objects.publicTables.length === 44, 'expected 44 public tables');
 assert(objects.publicViews.length === 2, 'expected 2 public views');
 assert(objects.publicTableColumns === 606, 'expected 606 public table columns');
 assert(objects.publicViewColumns === 27, 'expected 27 public view columns');
-assert(objects.functionOverloads.length === 108, 'expected 108 public function overloads');
+assert(objects.functionOverloads.length === 109, 'expected 109 public function overloads');
 exact('private function overloads', objects.privateFunctionOverloads, [
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
@@ -416,6 +417,7 @@ exact('private function overloads', objects.privateFunctionOverloads, [
   "private.assert_booking_payout_safe(p_booking bookings)",
   "private.bump_experience_media_revision()",
   "private.canonical_experience_media_locator(p_url text)",
+  "private.canonical_solo_ledger_json(p_value jsonb)",
   "private.capture_phone_followup()",
   "private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])",
   "private.community_media_backup_contract()",
@@ -461,11 +463,11 @@ assert(objects.realtimePublication.tables.length === 8, 'expected eight Realtime
 assert(objects.storageBuckets.length === 6, 'expected six Storage buckets');
 assert(objects.storageObjectPolicies.length === 16, 'expected 16 Storage policies');
 
-exact('private tables', objects.privateTables, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks"]);
+exact('private tables', objects.privateTables, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "host_profile_auth_cas", "host_profile_operation_context", "host_profile_source_authority", "phone_followup_tasks", "solo_refund_provider_ledger_evidence"]);
 exact('required private tables', required.applicationPrivateTables, objects.privateTables.map(name => `private.${name}`));
-assert(objects.privateTableColumns === 29 && objects.privateIndexes === 10 && objects.privateConstraints === 21,
+assert(objects.privateTableColumns === 36 && objects.privateIndexes === 13 && objects.privateConstraints === 27,
   'private cutover catalog counts differ');
-exact('private RLS tables', objects.privateRls.enabled, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "phone_followup_tasks"]);
+exact('private RLS tables', objects.privateRls.enabled, ["admin_monitor_cutover", "community_media_authority", "community_media_context", "community_media_plan_receipts", "phone_followup_tasks", "solo_refund_provider_ledger_evidence"]);
 assert(objects.privateRls.forced.length === 0 && objects.privateRls.policies === 0, 'private RLS policy surface differs');
 
 exact('required tables', required.applicationTables, objects.publicTables);
@@ -613,8 +615,8 @@ for (const identity of paymentClaim.securityDefinerFunctions) {
 assert(contract.includes('$payment_claim_contract$'), 'payment claim security contract is missing');
 
 const monitoring = manifest.adminMessageMonitoring;
-assert(manifest.schemaContractVersion === 10 && required.schemaContractVersion === 10,
-  'expected current-state contract version 10');
+assert(manifest.schemaContractVersion === 11 && required.schemaContractVersion === 11,
+  'expected current-state contract version 11');
 assert(monitoring.columns.length === 2 && monitoring.indexes.length === 2
   && monitoring.triggers.length === 2 && monitoring.functions.length === 7,
   'admin monitoring object counts differ');
@@ -712,8 +714,21 @@ assert(Object.entries(monitorIndex).every(([key, value]) => manifest.adminChatRe
   && monitorIndex.valid && monitorIndex.ready, 'Monitor must reuse unchanged visible-message index');
 const monitorLedger = monitor.ledgerEvidence[0];
 assert(monitor.ledgerEvidence.length === 1 && monitorLedger.version === '20261007024725'
-  && monitorLedger.statementCount === 1 && monitorLedger.statementsSha256 === expectedLedger.at(-1).repositorySha256
+  && monitorLedger.statementCount === 1 && monitorLedger.statementsSha256 === expectedLedger.find(entry => entry.version === monitorLedger.version).repositorySha256
   && contract.includes(`${monitorLedger.version}:${monitorLedger.name}:1:${monitorLedger.statementsMd5}:${monitorLedger.statementsSha256}`), 'Monitor applied ledger evidence differs');
+
+// Fresh applied metadata: a dedicated contract pins every ACL, body and relation shape.
+const soloLedger = manifest.appliedSoloLedgerReconciliationAuthority;
+const expectedSoloLedgerCatalog = {"tables":[{"acl":"{postgres=arwdDxtm/postgres,service_role=r/postgres}","rls":true,"name":"solo_refund_provider_ledger_evidence","force":false,"owner":"postgres","schema":"private"}],"columns":[{"acl":null,"name":"operation_id","type":"uuid","default":"","notNull":true},{"acl":null,"name":"evidence_sha256","type":"text","default":"","notNull":true},{"acl":null,"name":"cancellation_transaction_id","type":"text","default":"","notNull":true},{"acl":null,"name":"evidence_source","type":"text","default":"","notNull":true},{"acl":null,"name":"evidence_payload","type":"jsonb","default":"","notNull":true},{"acl":null,"name":"verified_by","type":"uuid","default":"","notNull":true},{"acl":null,"name":"recorded_at","type":"timestamp with time zone","default":"now()","notNull":true}],"indexes":[{"name":"solo_refund_provider_ledger_evi_cancellation_transaction_id_key","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evi_cancellation_transaction_id_key ON private.solo_refund_provider_ledger_evidence USING btree (cancellation_transaction_id)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_key","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evidence_evidence_sha256_key ON private.solo_refund_provider_ledger_evidence USING btree (evidence_sha256)"},{"name":"solo_refund_provider_ledger_evidence_pkey","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evidence_pkey ON private.solo_refund_provider_ledger_evidence USING btree (operation_id)"}],"policies":0,"functions":[{"acl":"{postgres=X/postgres}","owner":"postgres","result":"text","bodyMd5":"7e0440d970b63fda9704016c3c0f0a05","identity":"private.canonical_solo_ledger_json(p_value jsonb)","volatility":"i","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"SETOF booking_solo_refund_operations","bodyMd5":"ed8de830660b332e63ec8cdc38fabe1a","identity":"public.reconcile_solo_refund_provider_ledger_accepted_atomic(p_operation_id uuid, p_evidence jsonb, p_evidence_sha256 text, p_admin_id uuid)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true}],"constraints":[{"name":"solo_refund_provider_ledger_evi_cancellation_transaction_id_key","definition":"UNIQUE (cancellation_transaction_id)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_check","definition":"CHECK (evidence_sha256 ~ '^[a-f0-9]{64}$'::text)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_key","definition":"UNIQUE (evidence_sha256)"},{"name":"solo_refund_provider_ledger_evidence_evidence_source_check","definition":"CHECK (evidence_source = 'nicepay_merchant_ledger'::text)"},{"name":"solo_refund_provider_ledger_evidence_operation_id_fkey","definition":"FOREIGN KEY (operation_id) REFERENCES booking_solo_refund_operations(id)"},{"name":"solo_refund_provider_ledger_evidence_pkey","definition":"PRIMARY KEY (operation_id)"}]};
+const { ledgerEvidence: soloLedgerEvidence, ...soloLedgerCatalog } = soloLedger;
+assert(JSON.stringify(soloLedgerCatalog) === JSON.stringify(expectedSoloLedgerCatalog), 'solo ledger catalog evidence differs');
+exact('solo ledger applied evidence', soloLedgerEvidence, [{"version":"20261007061059","name":"solo_refund_provider_ledger_reconciliation","statementCount":1,"statementsMd5":"081d2c6304bf00b0269d5e190d091bcf","statementsSha256":"68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"}]);
+const soloLedgerAssertion = contract.match(/DO \$solo_ledger_reconciliation_catalog_contract\$[\s\S]*?\$solo_ledger_reconciliation_catalog_contract\$;/)?.[0];
+const stagingContract = await readFile(resolve(root, 'supabase/staging/schema-contract.sql'), 'utf8');
+assert(soloLedgerAssertion && stagingContract.includes(soloLedgerAssertion)
+  && soloLedgerAssertion.includes(JSON.stringify(expectedSoloLedgerCatalog).replaceAll("'", "''"))
+  && contract.includes('$solo_ledger_reconciliation_ledger_contract$')
+  && !stagingContract.includes('$solo_ledger_reconciliation_ledger_contract$'), 'solo ledger applied contract missing');
 
 console.log(JSON.stringify({
   migrationVersions: manifest.migrationLedger.map(({ version }) => version),

@@ -36,7 +36,7 @@ function exact(label, actual, expected) {
   }
 }
 
-exact('applied private tables', required.applicationPrivateTables, ["private.admin_monitor_cutover", "private.community_media_authority", "private.community_media_context", "private.community_media_plan_receipts", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks"]);
+exact('applied private tables', required.applicationPrivateTables, ["private.admin_monitor_cutover", "private.community_media_authority", "private.community_media_context", "private.community_media_plan_receipts", "private.host_profile_auth_cas", "private.host_profile_operation_context", "private.host_profile_source_authority", "private.phone_followup_tasks", "private.solo_refund_provider_ledger_evidence"]);
 if ('pendingPrivateTables' in required || 'pendingApplicationFunctions' in required) fail('applied attention objects remain pending');
 if (!attentionTargetContract.includes('BEGIN READ ONLY;') || !attentionTargetContract.trimEnd().endsWith('ROLLBACK;')
   || !attentionTargetContract.includes('ADMIN_ATTENTION_TARGET_CONTRACT_PASS')
@@ -77,6 +77,7 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
   'supabase/migrations/20261006173453_community_freeze_safeupdate.sql',
   'supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql',
+  'supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql',
 ];
 const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
@@ -158,7 +159,7 @@ for (const [name, fingerprint] of Object.entries({
   storagePolicies: '898e8b7f917fd0f4530ef30c9b61961e',
   publicRlsPolicies: 'e5a16a4215c569060fbf895453a5cd00',
   publicRelationGrants: '23a636eb7731f130f48aaeceb415c8cf',
-  privateRelationGrants: '5c6eec1ba4930757fff2e15e64d79d30',
+  privateRelationGrants: 'e12cdc9aaf5993e6c3a6997471907894',
 })) {
   if (current.securityFingerprints[name] !== fingerprint || !currentContract.includes(fingerprint)) {
     fail(`current-state security fingerprint differs: ${name}`);

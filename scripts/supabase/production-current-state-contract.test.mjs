@@ -32,6 +32,9 @@ assert.ok(communityCatalog && communityProduction && staging.includes(communityC
 const monitorCatalog = current.match(/DO \$admin_monitor_recency_catalog_contract\$[\s\S]*?\$admin_monitor_recency_catalog_contract\$;/)?.[0];
 const monitorLedger = current.match(/DO \$admin_monitor_recency_ledger_contract\$[\s\S]*?\$admin_monitor_recency_ledger_contract\$;/)?.[0];
 assert.ok(monitorCatalog && monitorLedger && staging.includes(monitorCatalog) && !staging.includes(monitorLedger));
+const soloLedgerCatalog = current.match(/DO \$solo_ledger_reconciliation_catalog_contract\$[\s\S]*?\$solo_ledger_reconciliation_catalog_contract\$;/)?.[0];
+const soloLedgerSQL = current.match(/DO \$solo_ledger_reconciliation_ledger_contract\$[\s\S]*?\$solo_ledger_reconciliation_ledger_contract\$;/)?.[0];
+assert.ok(soloLedgerCatalog && soloLedgerSQL && staging.includes(soloLedgerCatalog) && !staging.includes(soloLedgerSQL));
 const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
   + '\nEND\n$current_state_contract$;';
 assert.ok(chat && ledger && attention && marker && financialLedger && financialCatalog);
@@ -66,16 +69,19 @@ try {
     staticDriftChecks++;
     if (restore === null) await rm(path); else await writeFile(path,restore);
   };
-  const pending = JSON.parse(originalManifest).pendingProductionMigrations[0];
-  assert.equal(pending.version,'20261007052144');
-  const removedPending=JSON.parse(originalManifest);removedPending.pendingProductionMigrations=[];
-  await drift(manifestPath,removedPending,/manifest pending migration state differs/,originalManifest);
-  const claimedApplied=JSON.parse(originalManifest);claimedApplied.migrationLedger.push(pending);claimedApplied.pendingProductionMigrations=[];
-  await drift(manifestPath,claimedApplied,/migration versions differs/,originalManifest);
-  const relaxedPending=JSON.parse(originalRequired);relaxedPending.pendingProductionMigrations=[];
-  await drift(requiredPath,relaxedPending,/pending Production migration contract differs/,originalRequired);
-  const pendingPath=join(repoFixture,pending.repositoryFile),pendingBytes=await readFile(pendingPath,'utf8');
-  await drift(pendingPath,pendingBytes+'\n-- altered pending authority\n',/prepared migration bytes differ/,pendingBytes);
+  const applied = JSON.parse(originalManifest).migrationLedger.at(-1);
+  assert.equal(applied.version,'20261007061059');
+  assert.equal(applied.repositoryVersion,'20261007052144');
+  const removedApplied=JSON.parse(originalManifest);removedApplied.migrationLedger.pop();
+  await drift(manifestPath,removedApplied,/migration versions differs/,originalManifest);
+  const claimedPending=JSON.parse(originalManifest);claimedPending.pendingProductionMigrations=[applied];
+  await drift(manifestPath,claimedPending,/manifest pending migration state differs/,originalManifest);
+  const stalePending=JSON.parse(originalRequired);stalePending.pendingProductionMigrations=[applied];
+  await drift(requiredPath,stalePending,/pending Production migration contract differs/,originalRequired);
+  const appliedPath=join(repoFixture,applied.repositoryFile),appliedBytes=await readFile(appliedPath,'utf8');
+  await drift(appliedPath,appliedBytes+'\n-- altered applied authority\n',/repository migration hash differs/,appliedBytes);
+  const alteredSoloLedger=JSON.parse(originalManifest);alteredSoloLedger.appliedSoloLedgerReconciliationAuthority.functions[1].acl='{postgres=X/postgres,anon=X/postgres}';
+  await drift(manifestPath,alteredSoloLedger,/solo ledger catalog evidence differs/,originalManifest);
   const pendingP0 = JSON.parse(originalManifest);
   pendingP0.pendingProductionMigrations=[pendingP0.migrationLedger.pop()];
   await drift(manifestPath,pendingP0,/migration versions differs/,originalManifest);
@@ -119,7 +125,7 @@ try {
   await db.exec(`
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
     CREATE SCHEMA auth;
-    CREATE TABLE auth.users(id uuid PRIMARY KEY, email text);
+    CREATE TABLE auth.users(id uuid PRIMARY KEY, email text, email_confirmed_at timestamptz, deleted_at timestamptz);
     CREATE TABLE public.users(id uuid PRIMARY KEY, role text);
     CREATE TABLE public.admin_whitelist(email text);
     CREATE TABLE public.proxy_requests(id text PRIMARY KEY, user_id uuid, form_data jsonb);
@@ -276,6 +282,28 @@ try {
   await db.exec(financialFixture.trigger.definition);
   const financialMigration = await readFile('supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql','utf8');
   await db.exec(financialMigration);
+  const soloLedgerMigration = await readFile('supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql','utf8');
+  await db.exec(soloLedgerMigration);
+  await verify(soloLedgerCatalog); await verify(soloLedgerSQL); await verify(attention);
+  const soloSignature='public.reconcile_solo_refund_provider_ledger_accepted_atomic(uuid,jsonb,text,uuid)';
+  for (const role of ['anon','authenticated']) {
+    await rejectDrift(`GRANT EXECUTE ON FUNCTION ${soloSignature} TO ${role}`, `REVOKE EXECUTE ON FUNCTION ${soloSignature} FROM ${role}`, /Solo ledger catalog/, soloLedgerCatalog);
+  }
+  await rejectDrift(`REVOKE EXECUTE ON FUNCTION ${soloSignature} FROM service_role`, `GRANT EXECUTE ON FUNCTION ${soloSignature} TO service_role`, /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift(`ALTER FUNCTION ${soloSignature} SECURITY INVOKER`, `ALTER FUNCTION ${soloSignature} SECURITY DEFINER`, /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift(`ALTER FUNCTION ${soloSignature} SET search_path=public`, `ALTER FUNCTION ${soloSignature} SET search_path=''`, /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION private.canonical_solo_ledger_json(jsonb) TO service_role','REVOKE EXECUTE ON FUNCTION private.canonical_solo_ledger_json(jsonb) FROM service_role', /Solo ledger catalog/, soloLedgerCatalog);
+  for (const privilege of ['INSERT','UPDATE','DELETE']) {
+    await rejectDrift(`GRANT ${privilege} ON private.solo_refund_provider_ledger_evidence TO service_role`, `REVOKE ${privilege} ON private.solo_refund_provider_ledger_evidence FROM service_role`, /Solo ledger catalog/, soloLedgerCatalog);
+  }
+  await rejectDrift('GRANT SELECT ON private.solo_refund_provider_ledger_evidence TO authenticated','REVOKE SELECT ON private.solo_refund_provider_ledger_evidence FROM authenticated', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('GRANT INSERT(evidence_payload) ON private.solo_refund_provider_ledger_evidence TO service_role','REVOKE INSERT(evidence_payload) ON private.solo_refund_provider_ledger_evidence FROM service_role', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('ALTER TABLE private.solo_refund_provider_ledger_evidence DISABLE ROW LEVEL SECURITY','ALTER TABLE private.solo_refund_provider_ledger_evidence ENABLE ROW LEVEL SECURITY', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('CREATE POLICY open_evidence ON private.solo_refund_provider_ledger_evidence USING (true)','DROP POLICY open_evidence ON private.solo_refund_provider_ledger_evidence', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('ALTER TABLE private.solo_refund_provider_ledger_evidence ALTER COLUMN evidence_sha256 DROP NOT NULL','ALTER TABLE private.solo_refund_provider_ledger_evidence ALTER COLUMN evidence_sha256 SET NOT NULL', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift('ALTER INDEX private.solo_refund_provider_ledger_evidence_pkey RENAME TO changed_evidence_key','ALTER INDEX private.changed_evidence_key RENAME TO solo_refund_provider_ledger_evidence_pkey', /Solo ledger catalog/, soloLedgerCatalog);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- changed ledger'] WHERE version='20261007061059'", () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[soloLedgerMigration],'20261007061059']), /Solo ledger applied SQL/, soloLedgerSQL);
+
   // Empty disposable Host parents only. The applied SQL bytes stay unchanged.
   await db.exec(`CREATE ROLE supabase_auth_admin;
     ALTER TABLE auth.users ADD COLUMN raw_user_meta_data jsonb;

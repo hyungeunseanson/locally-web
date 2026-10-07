@@ -44,7 +44,8 @@ BEGIN
     '20261006105322:community_media_authority',
     '20261006133015:admin_chat_canonical_recency',
     '20261006180321:community_freeze_safeupdate',
-    '20261007024725:admin_chat_monitor_canonical_recency'
+    '20261007024725:admin_chat_monitor_canonical_recency',
+    '20261007061059:solo_refund_provider_ledger_reconciliation'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -225,6 +226,7 @@ BEGIN
     'public.prune_team_workspace_comments(p_task_id uuid, p_keep_limit integer)',
     'public.prune_team_workspace_tasks(p_keep_limit integer)',
     'public.reconcile_solo_refund_accepted_atomic(p_operation_id uuid, p_result_code text, p_refund_reference text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)',
+    'public.reconcile_solo_refund_provider_ledger_accepted_atomic(p_operation_id uuid, p_evidence jsonb, p_evidence_sha256 text, p_admin_id uuid)',
     'public.reconcile_solo_refund_rejected_atomic(p_operation_id uuid, p_result_code text, p_amount integer, p_transaction_reference text, p_order_reference text, p_admin_id uuid)',
     'public.record_media_deletion_step(p_asset_id uuid, p_event text, p_code text)',
     'public.record_solo_refund_outcome_atomic(p_operation_id uuid, p_attempt_identity uuid, p_outcome text, p_result_code text, p_refund_reference text, p_diagnostic_code text)',
@@ -277,6 +279,7 @@ BEGIN
     'private.assert_booking_payout_safe(p_booking bookings)',
     'private.bump_experience_media_revision()',
     'private.canonical_experience_media_locator(p_url text)',
+    'private.canonical_solo_ledger_json(p_value jsonb)',
     'private.capture_phone_followup()',
     'private.commit_community_post_images(p_actor_id uuid, p_post_id uuid, p_expected_revision bigint, p_expected_images text[], p_images text[])',
     'private.community_media_backup_contract()',
@@ -1379,7 +1382,7 @@ BEGIN
   IF to_regprocedure('private.prepare_support_message()') IS NULL
     OR to_regprocedure('private.advance_support_version()') IS NULL THEN RAISE EXCEPTION 'Missing Phase 1 safety functions'; END IF;
   SELECT array_agg(relname::text ORDER BY relname) INTO actual FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts');
+    WHERE n.nspname = 'private' AND relkind IN ('r','p') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts','solo_refund_provider_ledger_evidence');
   IF actual IS DISTINCT FROM ARRAY['admin_monitor_cutover']::text[] THEN RAISE EXCEPTION 'Private table inventory mismatch'; END IF;
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'private' AND tablename IN ('admin_monitor_cutover','phone_followup_tasks')) THEN RAISE EXCEPTION 'Private cutover policy exists'; END IF;
   SELECT array_agg(column_name || '|' || data_type || '|' || is_nullable || '|' || coalesce(column_default,'') ORDER BY ordinal_position)
@@ -1402,7 +1405,7 @@ BEGIN
     CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END || '|' || a.privilege_type || '|' || a.is_grantable::text,
     E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable))
     INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts');
+    CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname = 'private' AND c.relkind IN ('r','p','v','m','f') AND c.relname NOT IN ('phone_followup_tasks','host_profile_auth_cas','host_profile_operation_context','host_profile_source_authority','community_media_authority','community_media_context','community_media_plan_receipts','solo_refund_provider_ledger_evidence');
   IF fingerprint IS DISTINCT FROM 'c0c83ee9ce880c47d3d24f3f918b4364' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
 END $admin_attention_contract$;
 
@@ -1717,12 +1720,13 @@ BEGIN
     'host_profile_auth_cas',
     'host_profile_operation_context',
     'host_profile_source_authority',
-    'phone_followup_tasks'
+    'phone_followup_tasks',
+    'solo_refund_provider_ledger_evidence'
   ]::text[] THEN
     RAISE EXCEPTION 'Private table inventory mismatch: %', actual;
   END IF;
   SELECT md5(string_agg(n.nspname||'|'||c.relname||'|'||c.relkind::text||'|'||CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END||'|'||a.privilege_type||'|'||a.is_grantable::text,E'\n' ORDER BY n.nspname,c.relname,c.relkind::text,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable)) INTO fingerprint FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE n.nspname='private' AND c.relkind IN ('r','p','v','m','f');
-  IF fingerprint IS DISTINCT FROM '5c6eec1ba4930757fff2e15e64d79d30' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
+  IF fingerprint IS DISTINCT FROM 'e12cdc9aaf5993e6c3a6997471907894' THEN RAISE EXCEPTION 'Private relation grant fingerprint mismatch'; END IF;
   IF (SELECT count(*) FROM private.host_profile_source_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.host_profile_source_authority WHERE singleton AND r2_enabled) THEN RAISE EXCEPTION 'Production Host authority marker mismatch'; END IF;
 END $host_authority_production_contract$;
 
@@ -1811,5 +1815,21 @@ BEGIN
 END $admin_monitor_recency_ledger_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
+
+
+-- Catalog only: does not invoke the reconciliation RPC or inspect financial evidence rows.
+DO $solo_ledger_reconciliation_catalog_contract$
+DECLARE actual jsonb;
+BEGIN
+  SELECT jsonb_build_object('tables',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'owner',pg_get_userbyid(c.relowner),'rls',c.relrowsecurity,'force',c.relforcerowsecurity,'acl',c.relacl::text) ORDER BY c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='private' AND c.relname='solo_refund_provider_ledger_evidence'),'columns',(SELECT jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'notNull',a.attnotnull,'acl',a.attacl::text,'default',coalesce(pg_get_expr(d.adbin,d.adrelid),'')) ORDER BY a.attnum) FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE a.attrelid='private.solo_refund_provider_ledger_evidence'::regclass AND a.attnum>0 AND NOT a.attisdropped),'functions',(SELECT jsonb_agg(jsonb_build_object('identity',format('%I.%I(%s)',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid)),'owner',pg_get_userbyid(p.proowner),'securityDefiner',p.prosecdef,'volatility',p.provolatile,'result',pg_get_function_result(p.oid),'configuration',p.proconfig,'acl',p.proacl::text,'bodyMd5',md5(p.prosrc)) ORDER BY n.nspname,p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private') AND p.proname IN ('canonical_solo_ledger_json','reconcile_solo_refund_provider_ledger_accepted_atomic')),'indexes',(SELECT jsonb_agg(jsonb_build_object('name',x.indexname,'definition',x.indexdef,'valid',i.indisvalid,'ready',i.indisready) ORDER BY x.indexname) FROM pg_indexes x JOIN pg_namespace n ON n.nspname=x.schemaname JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=x.indexname JOIN pg_index i ON i.indexrelid=c.oid WHERE x.schemaname='private' AND x.tablename='solo_refund_provider_ledger_evidence'),'constraints',(SELECT jsonb_agg(jsonb_build_object('name',conname,'definition',pg_get_constraintdef(oid,true)) ORDER BY conname) FROM pg_constraint WHERE conrelid='private.solo_refund_provider_ledger_evidence'::regclass),'policies',(SELECT count(*) FROM pg_policies WHERE schemaname='private' AND tablename='solo_refund_provider_ledger_evidence')) INTO actual;
+  IF actual IS DISTINCT FROM '{"tables":[{"acl":"{postgres=arwdDxtm/postgres,service_role=r/postgres}","rls":true,"name":"solo_refund_provider_ledger_evidence","force":false,"owner":"postgres","schema":"private"}],"columns":[{"acl":null,"name":"operation_id","type":"uuid","default":"","notNull":true},{"acl":null,"name":"evidence_sha256","type":"text","default":"","notNull":true},{"acl":null,"name":"cancellation_transaction_id","type":"text","default":"","notNull":true},{"acl":null,"name":"evidence_source","type":"text","default":"","notNull":true},{"acl":null,"name":"evidence_payload","type":"jsonb","default":"","notNull":true},{"acl":null,"name":"verified_by","type":"uuid","default":"","notNull":true},{"acl":null,"name":"recorded_at","type":"timestamp with time zone","default":"now()","notNull":true}],"indexes":[{"name":"solo_refund_provider_ledger_evi_cancellation_transaction_id_key","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evi_cancellation_transaction_id_key ON private.solo_refund_provider_ledger_evidence USING btree (cancellation_transaction_id)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_key","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evidence_evidence_sha256_key ON private.solo_refund_provider_ledger_evidence USING btree (evidence_sha256)"},{"name":"solo_refund_provider_ledger_evidence_pkey","ready":true,"valid":true,"definition":"CREATE UNIQUE INDEX solo_refund_provider_ledger_evidence_pkey ON private.solo_refund_provider_ledger_evidence USING btree (operation_id)"}],"policies":0,"functions":[{"acl":"{postgres=X/postgres}","owner":"postgres","result":"text","bodyMd5":"7e0440d970b63fda9704016c3c0f0a05","identity":"private.canonical_solo_ledger_json(p_value jsonb)","volatility":"i","configuration":["search_path=\"\""],"securityDefiner":false},{"acl":"{postgres=X/postgres,service_role=X/postgres}","owner":"postgres","result":"SETOF booking_solo_refund_operations","bodyMd5":"ed8de830660b332e63ec8cdc38fabe1a","identity":"public.reconcile_solo_refund_provider_ledger_accepted_atomic(p_operation_id uuid, p_evidence jsonb, p_evidence_sha256 text, p_admin_id uuid)","volatility":"v","configuration":["search_path=\"\""],"securityDefiner":true}],"constraints":[{"name":"solo_refund_provider_ledger_evi_cancellation_transaction_id_key","definition":"UNIQUE (cancellation_transaction_id)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_check","definition":"CHECK (evidence_sha256 ~ ''^[a-f0-9]{64}$''::text)"},{"name":"solo_refund_provider_ledger_evidence_evidence_sha256_key","definition":"UNIQUE (evidence_sha256)"},{"name":"solo_refund_provider_ledger_evidence_evidence_source_check","definition":"CHECK (evidence_source = ''nicepay_merchant_ledger''::text)"},{"name":"solo_refund_provider_ledger_evidence_operation_id_fkey","definition":"FOREIGN KEY (operation_id) REFERENCES booking_solo_refund_operations(id)"},{"name":"solo_refund_provider_ledger_evidence_pkey","definition":"PRIMARY KEY (operation_id)"}]}'::jsonb THEN RAISE EXCEPTION 'Solo ledger catalog security or definition mismatch'; END IF;
+END $solo_ledger_reconciliation_catalog_contract$;
+
+DO $solo_ledger_reconciliation_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261007061059';
+  IF actual IS DISTINCT FROM ARRAY['20261007061059:solo_refund_provider_ledger_reconciliation:1:081d2c6304bf00b0269d5e190d091bcf:68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a']::text[] THEN RAISE EXCEPTION 'Solo ledger applied SQL mismatch'; END IF;
+END $solo_ledger_reconciliation_ledger_contract$;
 
 ROLLBACK;
