@@ -123,6 +123,7 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     // Preserve the already-active Production source authorities on every release.
     AVATAR_R2_SOURCE_ENABLED: 'true',
     HOST_PROFILE_R2_SOURCE_ENABLED: 'true',
+    COMMUNITY_R2_SOURCE_ENABLED: 'true',
     PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: profile.enabled,
     PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: profile.experienceIds,
     EXPERIENCE_MEDIA_R2_SOURCE_ENABLED: experienceMediaSourceProfile.enabled,

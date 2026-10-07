@@ -14,6 +14,7 @@ const expectedVariables = {
   CLOUDFLARE_DEPLOYMENT_ENV: 'production',
   AVATAR_R2_SOURCE_ENABLED: 'true',
   HOST_PROFILE_R2_SOURCE_ENABLED: 'true',
+  COMMUNITY_R2_SOURCE_ENABLED: 'true',
   PUBLIC_EXPERIENCE_MEDIA_PRODUCER_ENABLED: 'true',
   PUBLIC_EXPERIENCE_MEDIA_PRODUCER_EXPERIENCE_IDS: '3071,3309',
   EXPERIENCE_MEDIA_R2_SOURCE_ENABLED: 'true',
@@ -52,6 +53,7 @@ function preRolloutProductionSnapshot() {
       { name: 'PUBLIC_EXPERIENCE_MEDIA_R2', type: 'r2_bucket', bucket_name: 'locally-public-experience-canary' },
       { name: 'PUBLIC_AVATAR_R2', type: 'r2_bucket', bucket_name: 'locally-public-avatars' },
       { name: 'PUBLIC_HOST_PROFILE_SOURCE_R2', type: 'r2_bucket', bucket_name: 'locally-public-host-profile-originals' },
+      { name: 'PUBLIC_COMMUNITY_SOURCE_R2', type: 'r2_bucket', bucket_name: 'locally-public-community-originals' },
       { name: 'NEXT_CACHE_DO_QUEUE', type: 'durable_object_namespace', class_name: 'DOQueueHandler' },
       { name: 'NEXT_TAG_CACHE_DO_SHARDED', type: 'durable_object_namespace', class_name: 'DOShardedTagCache' },
       ...Object.entries(expectedVariables)
@@ -101,18 +103,19 @@ function expectFailure(remote, code, allowedPlannedChanges) {
   );
 }
 
-test('canonical release preserves the already-live Avatar and Host authority flags', async () => {
+test('canonical release preserves the already-live Avatar, Host and Community authority flags', async () => {
   const contract = await resolveProductionDeploymentContract();
-  for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']) {
+  for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED', 'COMMUNITY_R2_SOURCE_ENABLED']) {
     assert.equal(contract.runtimeVariables[name], 'true');
     assert(contract.wranglerArguments.includes(`${name}:true`));
   }
-  assert.equal(buildExpectedProductionContract(config, contract.runtimeVariables).r2.length, 4);
+  assert.equal(buildExpectedProductionContract(config, contract.runtimeVariables).r2.length, 5);
 });
 
 for (const [binding, bucket] of [
   ['PUBLIC_AVATAR_R2', 'locally-public-avatars'],
   ['PUBLIC_HOST_PROFILE_SOURCE_R2', 'locally-public-host-profile-originals'],
+  ['PUBLIC_COMMUNITY_SOURCE_R2', 'locally-public-community-originals'],
 ]) {
   test(`semantic gate rejects a removed or replaced live ${binding} in either direction`, () => {
     assert.deepEqual(config.env.production.r2_buckets.find(b => b.binding === binding), { binding, bucket_name: bucket });
@@ -125,7 +128,7 @@ for (const [binding, bucket] of [
         remote: preRolloutProductionSnapshot(),
         allowedPlannedChanges: ['SERVICE_COMPLETION_SCHEDULED_ENABLED'],
         allowedPlannedCronAdditions: ['7,37 * * * *'],
-      }), /r2_binding_mismatch/);
+      }), binding === 'PUBLIC_COMMUNITY_SOURCE_R2' ? /must preserve PUBLIC_COMMUNITY_SOURCE_R2/ : /r2_binding_mismatch/);
 
       const changedRemote = preRolloutProductionSnapshot();
       if (replace) changedRemote.bindings.find(b => b.name === binding).bucket_name = 'wrong-bucket';
@@ -135,7 +138,7 @@ for (const [binding, bucket] of [
   });
 }
 
-for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']) {
+for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED', 'COMMUNITY_R2_SOURCE_ENABLED']) {
   test(`semantic gate rejects missing, disabled or malformed ${name} without a waiver`, () => {
     for (const value of [undefined, 'false', 'TRUE']) {
       const changedConfig = structuredClone(config);
@@ -155,6 +158,20 @@ for (const name of ['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED'
     }
   });
 }
+
+test('Community authority cannot disappear from both the repository and remote snapshot', () => {
+  const changedConfig = structuredClone(config);
+  changedConfig.env.production.r2_buckets = changedConfig.env.production.r2_buckets
+    .filter(b => b.binding !== 'PUBLIC_COMMUNITY_SOURCE_R2');
+  const changedRemote = preRolloutProductionSnapshot();
+  changedRemote.bindings = changedRemote.bindings.filter(b => b.name !== 'PUBLIC_COMMUNITY_SOURCE_R2');
+  assert.throws(() => verifyProductionDeployContract({
+    expected: buildExpectedProductionContract(changedConfig, expectedVariables),
+    remote: changedRemote,
+    allowedPlannedChanges: [],
+    allowedPlannedCronAdditions: [],
+  }), /must preserve PUBLIC_COMMUNITY_SOURCE_R2/);
+});
 
 test('accepts a pre-rollout snapshot with only the explicit pending-cleanup Cron addition', () => {
   assert.deepEqual(verify(), {
