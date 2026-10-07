@@ -1315,7 +1315,14 @@
     "resultLimit": 25,
     "lockTimeout": "2s"
   },
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261007052144",
+      "name": "solo_refund_provider_ledger_reconciliation",
+      "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
+      "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
+    }
+  ],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"

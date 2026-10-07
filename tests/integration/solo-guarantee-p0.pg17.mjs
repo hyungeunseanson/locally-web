@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import crypto from 'node:crypto';
+import { LEDGER_BOOKING_FIELDS, prepareLedgerReconciliationProof } from '../../scripts/financial/solo-refund-ledger-proof.mjs';
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(here, '../..');
 if (!process.env.SOLO_PG17_MODULES) throw new Error('Set SOLO_PG17_MODULES to external embedded-postgres@17 / pg / esbuild node_modules');
@@ -196,6 +197,15 @@ try{
   await setup.query(await readFile(join(root,'supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql'),'utf8'));
   assert.deepEqual((await setup.query('SELECT '+financialFields.join(',')+' FROM bookings ORDER BY id')).rows,financialBefore);
   record('forward_safe_legacy_rows',{pass:true});
+  const originalAuthorities = (await setup.query("SELECT proname,pg_get_functiondef(oid) definition FROM pg_proc WHERE proname IN ('reconcile_solo_refund_accepted_atomic','reconcile_solo_refund_rejected_atomic','apply_solo_refund_settlement_atomic') ORDER BY proname")).rows;
+  const beforeLedgerMigration = (await setup.query('SELECT to_jsonb(b) row FROM bookings b ORDER BY id')).rows;
+  await setup.query(`CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,email_confirmed_at timestamptz,deleted_at timestamptz);
+    ALTER TABLE public.users ADD COLUMN role text;
+    INSERT INTO auth.users VALUES('${D}','audit-admin@example.invalid',now(),NULL),('${G}','audit-guest@example.invalid',now(),NULL);`);
+  await setup.query(await readFile(join(root,'supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql'),'utf8'));
+  assert.deepEqual((await setup.query('SELECT to_jsonb(b) row FROM bookings b ORDER BY id')).rows,beforeLedgerMigration);
+  assert.deepEqual((await setup.query("SELECT proname,pg_get_functiondef(oid) definition FROM pg_proc WHERE proname IN ('reconcile_solo_refund_accepted_atomic','reconcile_solo_refund_rejected_atomic','apply_solo_refund_settlement_atomic') ORDER BY proname")).rows,originalAuthorities);
+  record('ledger_migration_additive_existing_signed_and_settlement_authorities_unchanged',{pass:true});
   for(const client of [c1,c2,c3])await client.query('SET ROLE service_role');
   async function rpc(client,name,args={}) {const r=await adapter(client).rpc(name,args);if(r.error)throw Object.assign(new Error(r.error.message),{code:r.error.code});return r.data;}
   const claim=(client,id)=>rpc(client,'claim_solo_refund_atomic',{p_booking_id:id});
@@ -536,6 +546,126 @@ try{
   await m.finishSettlementSyncRunSuccess({supabaseAdmin:adapter(c2,{beforeRpc:async({name})=>name==='solo_refund_diagnostics'?{data:manualOnly,error:null}:undefined}),runId:2,jobName:'experience_completion_sync',startedAt:new Date().toISOString(),leaseToken:'manual-lease',processedCount:1,skippedCount:0});
   assert.equal((await setup.query('SELECT status FROM admin_job_runs WHERE id=2')).rows[0].status,'failed');
   record('admin_job_manual_pending_attention_without_card_unknown',{pass:true});
+  async function ledgerFixture() {
+    const slot=await pair('card',38000,'completed','not_applicable','nicepay');
+    const [operation]=await claim(c1,slot.id);await begin(c1,operation.id);
+    await rpc(c1,'record_solo_refund_outcome_atomic',{p_operation_id:operation.id,p_attempt_identity:operation.attempt_identity,p_outcome:'unknown',p_diagnostic_code:'provider_response_correlation_failed'});
+    const op=(await setup.query('SELECT * FROM booking_solo_refund_operations WHERE id=$1',[operation.id])).rows[0];
+    const booking=await read(slot.id);
+    const numeric=new Set(['amount','host_payout_amount','platform_revenue','price_at_booking','refund_amount','solo_guarantee_price','solo_guarantee_refund_amount','total_experience_price','total_price']);
+    const snapshot=Object.fromEntries(LEDGER_BOOKING_FIELDS.map(key=>[key,booking[key]==null?null:numeric.has(key)?Number(booking[key]):booking[key]]));
+    const started=new Date(op.request_started_at).getTime(),captured=Date.now();
+    const evidence={schema_version:1,evidence_source:'nicepay_merchant_ledger',provider:'nicepay',payment_method:'card',
+      operation_id:op.id,booking_id:slot.id,attempt_identity:op.attempt_identity,operation_order_reference:op.order_reference,
+      merchant_id:'TESTMID',original_transaction_id:op.transaction_reference,cancellation_transaction_id:'TESTMID-CANCEL-'+op.attempt_identity,
+      original_amount:op.gross_amount,cancel_amount:op.requested_amount,remaining_amount:op.gross_amount-op.requested_amount,cancellation_count:1,
+      original_approved_at:new Date(started-60_000).toISOString(),cancelled_at:new Date(Math.floor(started/1000)*1000).toISOString(),
+      captured_at:new Date(captured).toISOString(),acquired_on:new Date(captured+9*60*60*1000).toISOString().slice(0,10),
+      query_from:new Date(started-86_400_000).toISOString(),query_to:new Date(captured+86_400_000).toISOString(),
+      query_scope:'original_order_all_states',transaction_state:'후취소',acquisition_state:'취소매입',provider_export_sha256:'a'.repeat(64),provider_verifier_account:'test-merchant-admin',
+      verifying_admin_id:D,booking_snapshot:snapshot};
+    return {slot,op,evidence};
+  }
+  const ledgerApply=(client,evidence)=>rpc(client,'reconcile_solo_refund_provider_ledger_accepted_atomic',prepareLedgerReconciliationProof(evidence).parameters);
+  const money=async id=>{const b=await read(id);return {refund:Number(b.refund_amount),host:b.host_payout_amount,platform:b.platform_revenue,basis:Number(b.total_price),payout:b.payout_status};};
+  const validLedger=await ledgerFixture();
+  const notificationsBefore=(await setup.query('SELECT count(*)::int n FROM notifications')).rows[0].n;
+  await assert.rejects(c1.query('INSERT INTO private.solo_refund_provider_ledger_evidence(operation_id) VALUES($1)',[validLedger.op.id]),{code:'42501'});
+  await setup.query('BEGIN');await setup.query('SET LOCAL ROLE authenticated');
+  await assert.rejects(setup.query('SELECT * FROM private.solo_refund_provider_ledger_evidence'),{code:'42501'});await setup.query('ROLLBACK');
+  const canonical=(await setup.query("SELECT private.canonical_solo_ledger_json($1::jsonb) text",[JSON.stringify(validLedger.evidence)])).rows[0].text;
+  assert.equal(crypto.createHash('sha256').update(canonical).digest('hex'),prepareLedgerReconciliationProof(validLedger.evidence).evidenceSha256);
+  const originalNetwork=globalThis.fetch;let ledgerNetworkCalls=0;globalThis.fetch=()=>{ledgerNetworkCalls++;throw new Error('Ledger provider call forbidden');};
+  try {
+    const [result]=await ledgerApply(c1,validLedger.evidence);
+    assert.equal(result.outcome,'accepted');assert.ok(result.settlement_applied_at);
+    assert.equal(result.result_code,null);assert.equal(result.provider_refund_reference,null);
+    assert.equal(result.proof_transaction_reference,validLedger.op.transaction_reference);
+    assert.match(result.proof_reference,/^nicepay-ledger:[a-f0-9]{64}$/);
+    assert.equal(result.delivery_state,'pending');assert.equal(result.delivery_attempts,0);
+    assert.deepEqual(await money(validLedger.slot.id),{refund:38000,host:30400,platform:11400,basis:38000,payout:'pending'});
+    assert.equal((await setup.query('SELECT count(*)::int n FROM notifications')).rows[0].n,notificationsBefore);
+    const state=(await setup.query('SELECT to_jsonb(b) row FROM bookings b WHERE id=$1',[validLedger.slot.id])).rows[0];
+    const ops=(await setup.query('SELECT to_jsonb(o) row FROM booking_solo_refund_operations o WHERE id=$1',[result.id])).rows[0];
+    await ledgerApply(c2,validLedger.evidence);
+    assert.deepEqual((await setup.query('SELECT to_jsonb(b) row FROM bookings b WHERE id=$1',[validLedger.slot.id])).rows[0],state);
+    assert.deepEqual((await setup.query('SELECT to_jsonb(o) row FROM booking_solo_refund_operations o WHERE id=$1',[result.id])).rows[0],ops);
+    assert.equal(ledgerNetworkCalls,0);
+    assert.equal((await setup.query('SELECT count(*)::int n FROM notifications')).rows[0].n,notificationsBefore);
+  } finally {globalThis.fetch=originalNetwork;}
+  record('ledger_exact_unknown_accepted_atomic_settlement_and_same_evidence_replay',{pass:true,providerCalls:ledgerNetworkCalls});
+  for (const [name,change] of [
+    ['amount',p=>{p.cancel_amount++;p.remaining_amount--;}],['TID',p=>{p.original_transaction_id='OTHER-TID';}],
+    ['MID',p=>{p.merchant_id='OTHER';p.cancellation_transaction_id='OTHER-CANCEL';}],
+    ['gross',p=>{p.original_amount++;p.remaining_amount++;}],['snapshot',p=>{p.booking_snapshot.host_payout_amount++;}],
+    ['booking',p=>{p.booking_id='OTHER';}],['attempt',p=>{p.attempt_identity=G;}],
+    ['order',p=>{p.operation_order_reference='OTHER';}],['time',p=>{p.cancelled_at=new Date(Date.parse(p.cancelled_at)+60_000).toISOString();p.captured_at=p.cancelled_at;}],
+  ]) {
+    const f=await ledgerFixture(),bad=structuredClone(f.evidence);change(bad);
+    await assert.rejects(ledgerApply(c1,bad),/SOLO_LEDGER_(OPERATION_MISMATCH|SNAPSHOT_CONFLICT|TIME_MISMATCH)/);
+    assert.equal((await money(f.slot.id)).refund,0);
+    assert.equal((await setup.query('SELECT count(*)::int n FROM private.solo_refund_provider_ledger_evidence WHERE operation_id=$1',[f.op.id])).rows[0].n,0);
+    record('ledger_wrong_'+name+'_rejected',{pass:true});
+  }
+  for (const [name,patch] of [['payout_paid',"payout_status='paid'"],['booking_drift','platform_revenue=platform_revenue+1'],['not_completed',"status='confirmed'"]]) {
+    const f=await ledgerFixture();
+    // Local superuser fault injection models pre-existing corrupt/drifted rows.
+    // Real money guards stay enabled for every RPC and all earlier race tests.
+    await setup.query('BEGIN');await setup.query('SET LOCAL session_replication_role=replica');
+    await setup.query('UPDATE bookings SET '+patch+' WHERE id=$1',[f.slot.id]);await setup.query('COMMIT');
+    await assert.rejects(ledgerApply(c1,f.evidence),/SOLO_LEDGER_SNAPSHOT_CONFLICT/);
+    assert.equal((await money(f.slot.id)).refund,0);record('ledger_'+name+'_rejected',{pass:true});
+  }
+  const impossible=await ledgerFixture(),impossibleParams=prepareLedgerReconciliationProof(impossible.evidence).parameters;
+  impossibleParams.p_evidence.remaining_amount++;
+  const {canonicalLedgerJson}=await import('../../scripts/financial/solo-refund-ledger-proof.mjs');
+  impossibleParams.p_evidence_sha256=crypto.createHash('sha256').update(canonicalLedgerJson(impossibleParams.p_evidence)).digest('hex');
+  await assert.rejects(rpc(c1,'reconcile_solo_refund_provider_ledger_accepted_atomic',impossibleParams),/SOLO_LEDGER_OPERATION_MISMATCH/);
+  const rollback=await ledgerFixture();
+  await setup.query(`CREATE FUNCTION private.reject_ledger_settlement_fixture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id='${rollback.slot.id}' AND NEW.solo_guarantee_refund_status='refunded' THEN RAISE EXCEPTION 'LOCAL_SETTLEMENT_FAULT'; END IF; RETURN NEW; END $$; CREATE TRIGGER ledger_settlement_fault BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION private.reject_ledger_settlement_fixture();`);
+  await assert.rejects(ledgerApply(c1,rollback.evidence),/LOCAL_SETTLEMENT_FAULT/);
+  await setup.query('DROP TRIGGER ledger_settlement_fault ON bookings; DROP FUNCTION private.reject_ledger_settlement_fixture()');
+  const rollbackOp=(await setup.query('SELECT * FROM booking_solo_refund_operations WHERE id=$1',[rollback.op.id])).rows[0];
+  assert.equal(rollbackOp.outcome,'unknown');assert.equal(rollbackOp.proof_reference,null);assert.equal(rollbackOp.settlement_applied_at,null);
+  assert.equal((await setup.query('SELECT count(*)::int n FROM private.solo_refund_provider_ledger_evidence WHERE operation_id=$1',[rollback.op.id])).rows[0].n,0);
+  assert.equal((await money(rollback.slot.id)).refund,0);
+  record('ledger_impossible_balance_and_settlement_failure_atomic_rollback',{pass:true});
+  const secondEvidence=structuredClone(validLedger.evidence);secondEvidence.captured_at=new Date(Date.parse(secondEvidence.captured_at)+1).toISOString();
+  await assert.rejects(ledgerApply(c1,secondEvidence),/SOLO_LEDGER_EVIDENCE_CONFLICT/);
+  const wrongOperation=await ledgerFixture();const reused=prepareLedgerReconciliationProof(validLedger.evidence).parameters;reused.p_operation_id=wrongOperation.op.id;
+  await assert.rejects(rpc(c1,'reconcile_solo_refund_provider_ledger_accepted_atomic',reused),/SOLO_LEDGER_PROOF_INVALID/);
+  const reusedCancel=structuredClone(wrongOperation.evidence);reusedCancel.cancellation_transaction_id=validLedger.evidence.cancellation_transaction_id;
+  await assert.rejects(ledgerApply(c1,reusedCancel),{code:'23505'});
+  assert.equal((await money(wrongOperation.slot.id)).refund,0);
+  record('ledger_second_evidence_and_cross_operation_digest_or_cancel_tid_rejected',{pass:true});
+  const badAdmin=await ledgerFixture();badAdmin.evidence.verifying_admin_id=G;
+  await assert.rejects(ledgerApply(c1,badAdmin.evidence),/SOLO_LEDGER_ADMIN_REQUIRED/);
+  const wrongDigest=await ledgerFixture(),params=prepareLedgerReconciliationProof(wrongDigest.evidence).parameters;params.p_evidence_sha256='0'.repeat(64);
+  await assert.rejects(rpc(c1,'reconcile_solo_refund_provider_ledger_accepted_atomic',params),/SOLO_LEDGER_DIGEST_MISMATCH/);
+  record('ledger_real_admin_and_digest_required',{pass:true});
+  const signedSettled=await ledgerFixture();await rpc(c1,'reconcile_solo_refund_accepted_atomic',{p_operation_id:signedSettled.op.id,p_result_code:'2001',p_refund_reference:'EXACT-PROVIDER-REF',p_amount:38000,p_transaction_reference:signedSettled.op.transaction_reference,p_order_reference:signedSettled.op.order_reference,p_admin_id:D});
+  const signedState=await money(signedSettled.slot.id);await ledgerApply(c2,signedSettled.evidence);
+  assert.deepEqual(await money(signedSettled.slot.id),signedState);
+  assert.equal((await setup.query('SELECT count(*)::int n FROM private.solo_refund_provider_ledger_evidence WHERE operation_id=$1',[signedSettled.op.id])).rows[0].n,0);
+  record('ledger_already_signed_settled_is_read_current_no_double_apply',{pass:true});
+  const replayRace=await ledgerFixture();await Promise.all([ledgerApply(c1,replayRace.evidence),ledgerApply(c2,replayRace.evidence)]);
+  assert.deepEqual(await money(replayRace.slot.id),{refund:38000,host:30400,platform:11400,basis:38000,payout:'pending'});
+  record('ledger_concurrent_same_proof_exactly_once',{pass:true});
+  const conflictRace=await ledgerFixture(),conflictProof=structuredClone(conflictRace.evidence);
+  conflictProof.captured_at=new Date(Date.parse(conflictProof.captured_at)+1).toISOString();
+  const conflictResults=await Promise.allSettled([ledgerApply(c1,conflictRace.evidence),ledgerApply(c2,conflictProof)]);
+  assert.equal(conflictResults.filter(x=>x.status==='fulfilled').length,1);
+  assert.match(conflictResults.find(x=>x.status==='rejected').reason.message,/SOLO_LEDGER_EVIDENCE_CONFLICT/);
+  assert.deepEqual(await money(conflictRace.slot.id),{refund:38000,host:30400,platform:11400,basis:38000,payout:'pending'});
+  record('ledger_concurrent_conflicting_proofs_one_winner_one_conflict',{pass:true});
+  const guarded=await ledgerFixture();await assert.rejects(pay(c2,guarded.slot.id),/BOOKING_MONEY_UNRESOLVED/);
+  assert.equal((await cancelClaim(c2,guarded.slot.id)).length,0);
+  await ledgerApply(c1,guarded.evidence);
+  const [subsequentCancel]=await cancelClaim(c2,guarded.slot.id);
+  assert.ok(subsequentCancel);assert.equal(subsequentCancel.total_price,38000);
+  assert.equal((await cancelClaim(c1,guarded.slot.id)).length,0);
+  const finalMoney=await money(guarded.slot.id);assert.equal(finalMoney.refund+finalMoney.host+finalMoney.platform,guarded.op.gross_amount);
+  record('ledger_payout_cancellation_guards_and_monetary_conservation',{pass:true});
   console.log('PAYOUT_REFUND_RACE_SAFE');console.log('DOUBLE_REFUND_PROTECTED');console.log('FINANCIAL_AUTHORITY_BYPASS_IMPOSSIBLE');
   console.log('PG17_P0_PASS',JSON.stringify({version,checks:checks.length}));
 } finally { for(const c of clients)await c.end().catch(()=>{});await pg.stop().catch(()=>{});await rm(dir,{recursive:true,force:true}); }

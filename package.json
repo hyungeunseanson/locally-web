@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test:solo-guarantee-p0:native": "node tests/integration/solo-guarantee-p0.pg17.mjs",
+    "test:solo-refund-ledger-proof": "node --test tests/unit/solo-refund-provider-ledger-proof.test.mjs",
     "test:solo-guarantee-p0:browser": "node tests/integration/solo-guarantee-p0.browser.mjs",
     "dev": "next dev",
     "build": "next build",

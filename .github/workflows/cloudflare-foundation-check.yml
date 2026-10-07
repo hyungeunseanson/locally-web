@@ -156,6 +156,7 @@ jobs:
 
       - name: Validate Financial P0 on native PostgreSQL 17 and NICEPAY ACK
         run: |
+          npm run test:solo-refund-ledger-proof
           SOLO_PG17_MODULES="$RUNNER_TEMP/host-pg17/node_modules" npm run test:solo-guarantee-p0:native
           node --test tests/unit/nicepay-solo-refund-notification.test.mjs
 

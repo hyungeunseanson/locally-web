@@ -32,7 +32,14 @@
     "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
     "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261007052144",
+      "name": "solo_refund_provider_ledger_reconciliation",
+      "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
+      "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
