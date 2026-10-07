@@ -1,4 +1,4 @@
--- Fresh-project target only: Production has NOT applied the Monitor migration.
+-- Applied Monitor catalog security; shared by Production and fresh projects.
 BEGIN READ ONLY;
 DO $admin_monitor_recency_target_contract$
 DECLARE

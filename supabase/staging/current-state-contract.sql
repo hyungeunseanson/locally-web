@@ -43,7 +43,8 @@ BEGIN
     '20261006013755:host_profile_media_authority',
     '20261006105322:community_media_authority',
     '20261006133015:admin_chat_canonical_recency',
-    '20261006180321:community_freeze_safeupdate'
+    '20261006180321:community_freeze_safeupdate',
+    '20261007024725:admin_chat_monitor_canonical_recency'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -211,6 +212,7 @@ BEGIN
     'public.increment_like_count()',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)',
     'public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)',
+    'public.list_admin_monitor_recency(p_offset integer, p_limit integer, p_inquiry_ids bigint[])',
     'public.list_admin_phone_recency(p_offset integer, p_limit integer)',
     'public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])',
     'public.list_due_experience_completion_candidates(p_booking_id text)',
@@ -1770,6 +1772,43 @@ BEGIN
   IF actual IS DISTINCT FROM ARRAY['20261006180321:community_freeze_safeupdate:1:d6fbf1ae7b3fefd10210ef4c9d4b7a77:d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd']::text[] THEN RAISE EXCEPTION 'Community hotfix applied ledger SQL mismatch'; END IF;
   IF (SELECT count(*) FROM private.community_media_authority)<>1 OR NOT EXISTS(SELECT 1 FROM private.community_media_authority WHERE singleton AND legacy_writes_frozen=true) THEN RAISE EXCEPTION 'Production Community authority marker mismatch'; END IF;
 END $community_authority_production_contract$;
+
+DO $admin_monitor_recency_target_contract$
+DECLARE
+  fn oid := to_regprocedure('public.list_admin_monitor_recency(integer,integer,bigint[])');
+  role_name text;
+BEGIN
+  IF fn IS NULL THEN RAISE EXCEPTION 'Monitor canonical RPC missing'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc WHERE oid = fn AND provolatile = 's' AND NOT prosecdef
+      AND proconfig = ARRAY['search_path=""']
+      AND pg_get_function_result(oid) = 'TABLE(id text, canonical_activity_at timestamp with time zone)'
+  ) THEN RAISE EXCEPTION 'Monitor canonical RPC security/result differs'; END IF;
+  IF EXISTS (SELECT 1 FROM aclexplode((SELECT proacl FROM pg_proc WHERE oid = fn)) WHERE grantee = 0 AND privilege_type = 'EXECUTE') THEN
+    RAISE EXCEPTION 'Monitor canonical RPC exposes PUBLIC EXECUTE';
+  END IF;
+  FOREACH role_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF has_function_privilege(role_name, fn, 'EXECUTE') THEN RAISE EXCEPTION 'Monitor canonical RPC exposes %', role_name; END IF;
+  END LOOP;
+  IF NOT has_function_privilege('service_role', fn, 'EXECUTE') THEN RAISE EXCEPTION 'Monitor canonical RPC service_role missing'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_index WHERE indexrelid = to_regclass('public.admin_chat_visible_message_recency') AND indisvalid AND indisready) THEN
+    RAISE EXCEPTION 'Monitor canonical RPC requires applied visible-message index';
+  END IF;
+END;
+$admin_monitor_recency_target_contract$;
+-- Applied Monitor catalog only; no business mutation RPC calls.
+DO $admin_monitor_recency_catalog_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef::text||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||array_to_string(p.proconfig,',')||'|'||p.proacl::text||'|'||md5(p.prosrc) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='list_admin_monitor_recency';
+  IF actual IS DISTINCT FROM ARRAY['public.list_admin_monitor_recency(p_offset integer, p_limit integer, p_inquiry_ids bigint[])|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|caea0b27c619d17e52f6feccf22cbfa2']::text[] THEN RAISE EXCEPTION 'Monitor function body or ACL mismatch'; END IF;
+END $admin_monitor_recency_catalog_contract$;
+DO $admin_monitor_recency_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261007024725';
+  IF actual IS DISTINCT FROM ARRAY['20261007024725:admin_chat_monitor_canonical_recency:1:1b414ef098c88814ce9c37dd27114f86:45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26']::text[] THEN RAISE EXCEPTION 'Monitor applied ledger SQL mismatch'; END IF;
+END $admin_monitor_recency_ledger_contract$;
 
 SELECT 'LOCALLY_PRODUCTION_CURRENT_STATE_CONTRACT_PASS' AS result;
 

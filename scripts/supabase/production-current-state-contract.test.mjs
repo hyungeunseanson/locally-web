@@ -29,6 +29,9 @@ assert.ok(!staging.includes(recencyLedger));
 const communityCatalog = current.match(/DO \$community_authority_catalog_contract\$[\s\S]*?\$community_authority_catalog_contract\$;/)?.[0];
 const communityProduction = current.match(/DO \$community_authority_production_contract\$[\s\S]*?\$community_authority_production_contract\$;/)?.[0];
 assert.ok(communityCatalog && communityProduction && staging.includes(communityCatalog) && !staging.includes(communityProduction));
+const monitorCatalog = current.match(/DO \$admin_monitor_recency_catalog_contract\$[\s\S]*?\$admin_monitor_recency_catalog_contract\$;/)?.[0];
+const monitorLedger = current.match(/DO \$admin_monitor_recency_ledger_contract\$[\s\S]*?\$admin_monitor_recency_ledger_contract\$;/)?.[0];
+assert.ok(monitorCatalog && monitorLedger && staging.includes(monitorCatalog) && !staging.includes(monitorLedger));
 const productionLedger = current.match(/DO \$current_state_contract\$[\s\S]*?RAISE EXCEPTION 'migration ledger mismatch:[\s\S]*?END IF;/)?.[0]
   + '\nEND\n$current_state_contract$;';
 assert.ok(chat && ledger && attention && marker && financialLedger && financialCatalog);
@@ -363,6 +366,18 @@ try {
     () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[recencyMigration],'20261006133015']), /Recency applied ledger SQL mismatch/, recencyLedger);
   await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261006133015'",
     () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261006133015','admin_chat_canonical_recency',[recencyMigration]]), /Recency applied ledger SQL mismatch/, recencyLedger);
+  const monitorMigration = await readFile('supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql','utf8');
+  await db.exec(monitorMigration); await verify(monitorCatalog); await verify(monitorLedger);
+  await rejectDrift('GRANT EXECUTE ON FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) TO authenticated',
+    'REVOKE EXECUTE ON FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) FROM authenticated', /Monitor function body or ACL mismatch/, monitorCatalog);
+  await rejectDrift('ALTER FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) SECURITY DEFINER',
+    'ALTER FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) SECURITY INVOKER', /Monitor function body or ACL mismatch/, monitorCatalog);
+  await rejectDrift('ALTER FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) SET search_path=public',
+    "ALTER FUNCTION list_admin_monitor_recency(integer,integer,bigint[]) SET search_path=''", /Monitor function body or ACL mismatch/, monitorCatalog);
+  await rejectDrift("UPDATE supabase_migrations.schema_migrations SET statements=ARRAY['-- changed Monitor'] WHERE version='20261007024725'",
+    () => db.query('UPDATE supabase_migrations.schema_migrations SET statements=$1 WHERE version=$2', [[monitorMigration],'20261007024725']), /Monitor applied ledger SQL mismatch/, monitorLedger);
+  await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261007024725'",
+    () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261007024725','admin_chat_monitor_canonical_recency',[monitorMigration]]), /Monitor applied ledger SQL mismatch/, monitorLedger);
   await verify(mediaLedger); await verify(mediaCatalog); await verify(productionLedger);
   await rejectDrift("DELETE FROM supabase_migrations.schema_migrations WHERE version='20261005082309'",
     () => db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1,$2,$3)', ['20261005082309','avatar_media_authority',[avatarMigration]]),

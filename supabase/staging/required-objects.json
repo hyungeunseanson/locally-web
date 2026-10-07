@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 9,
+  "schemaContractVersion": 10,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -32,14 +32,7 @@
     "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
     "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261007024725",
-      "name": "admin_chat_monitor_canonical_recency",
-      "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
-      "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -180,6 +173,7 @@
     "is_inquiry_admin_sender",
     "journal_solo_refund_attempt",
     "lease_experience_translation_task",
+    "list_admin_monitor_recency",
     "list_admin_phone_recency",
     "list_admin_support_recency",
     "list_due_experience_completion_candidates",

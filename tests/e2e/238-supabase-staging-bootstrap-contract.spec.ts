@@ -63,6 +63,7 @@ test.describe('Supabase staging bootstrap contract', () => {
       '20261006105322',
       '20261006133015',
       '20261006180321',
+      '20261007024725',
     ]);
     expect(manifest.freshProjectApplyOrder).toEqual([
       'supabase/migrations/20260912034545_production_schema_baseline.sql',
@@ -99,14 +100,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(manifest.applicationFunctions).toEqual(expect.arrayContaining([
       'ack_admin_inquiry_snapshot', 'get_admin_attention',
     ]));
-    expect(manifest.pendingProductionMigrations).toEqual([
-  {
-    "version": "20261007024725",
-    "name": "admin_chat_monitor_canonical_recency",
-    "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
-    "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
-  }
-]);
+    expect(manifest.pendingProductionMigrations).toEqual([]);
     expect(packageJson.scripts['supabase:staging:baseline:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:current:check']).toBeTruthy();
     expect(packageJson.scripts['supabase:staging:contract']).toBeTruthy();
@@ -114,10 +108,10 @@ test.describe('Supabase staging bootstrap contract', () => {
 
   test('keeps the schema inventory and assertion transactions read-only', () => {
     const capture = readFileSync(currentManifest.source.captureSql, 'utf8');
-    expect(capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm)).toHaveLength(7);
-    expect(capture.match(/^ROLLBACK;$/gm)).toHaveLength(7);
+    expect(capture.match(/^BEGIN TRANSACTION READ ONLY;$/gm)).toHaveLength(8);
+    expect(capture.match(/^ROLLBACK;$/gm)).toHaveLength(8);
     expect(currentManifest.migrationLedger.slice(-4).map((entry: { version: string }) => entry.version))
-      .toEqual(['20261006013755', '20261006105322', '20261006133015', '20261006180321']);
+      .toEqual(['20261006105322', '20261006133015', '20261006180321', '20261007024725']);
     expect(currentManifest.migrationLedger.some((entry: { version: string }) => entry.version === '20261005104924')).toBe(true);
     expect(currentManifest.pendingProductionMigrations).toEqual(manifest.pendingProductionMigrations);
     expect(currentManifest.appliedFinancialAuthority.functions).toHaveLength(25);
@@ -237,8 +231,8 @@ test.describe('Supabase staging bootstrap contract', () => {
         ledgerStatementsSha256: 'd20d5774318f8fe52dc41d13a533728b13c98a20fab812cd693737dba0de51a2',
       },
     ]);
-    expect(currentManifest.schemaContractVersion).toBe(9);
-    expect(manifest.schemaContractVersion).toBe(9);
+    expect(currentManifest.schemaContractVersion).toBe(10);
+    expect(manifest.schemaContractVersion).toBe(10);
     expect(currentManifest.migrationLedger.slice(17, 19)).toEqual([
       {
         version: '20261003012400', name: 'phone_followup_tasks', repositoryVersion: '20261002140902',
@@ -269,7 +263,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     });
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('CURRENT_STATE_CATALOG_DRIFT_TEST_PASS');
-    expect(result.stdout).toContain('"driftChecks":89');
+    expect(result.stdout).toContain('"driftChecks":94');
     expect(result.stdout).toContain('"staticDriftChecks":5');
     expect(result.stdout).toContain('"productionMutation":0');
   });
@@ -382,7 +376,7 @@ test.describe('Supabase staging bootstrap contract', () => {
     expect(currentManifest.objects.publicViews).toHaveLength(2);
     expect(currentManifest.objects.publicTableColumns).toBe(606);
     expect(currentManifest.objects.publicViewColumns).toBe(27);
-    expect(currentManifest.objects.functionOverloads).toHaveLength(107);
+    expect(currentManifest.objects.functionOverloads).toHaveLength(108);
     expect(currentManifest.objects.privateFunctionOverloads).toEqual([
   "private.admin_chat_phone_title(category text, form_data jsonb)",
   "private.adopt_phone_followup_link()",
