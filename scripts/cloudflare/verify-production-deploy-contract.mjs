@@ -11,7 +11,7 @@ const EXPECTED_ENVIRONMENT = 'production';
 const DEFAULT_QUEUE_BATCH_TIMEOUT_SECONDS = 5;
 
 const MANAGED_FEATURE_VARIABLE = /_ENABLED$/;
-const PRESERVED_SOURCE_FLAGS = new Set(['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED']);
+const PRESERVED_SOURCE_FLAGS = new Set(['AVATAR_R2_SOURCE_ENABLED', 'HOST_PROFILE_R2_SOURCE_ENABLED', 'COMMUNITY_R2_SOURCE_ENABLED']);
 
 function fail(code, diagnostics) {
   diagnostics.add(code);
@@ -80,6 +80,12 @@ export function buildExpectedProductionContract(config, expectedVariables) {
     assert.equal(production.vars?.[name], 'true', `Production release must preserve ${name}=true.`);
     assert.equal(expectedVariables[name], 'true', `Production release contract must preserve ${name}=true.`);
   }
+
+  assert.deepEqual(
+    (production.r2_buckets ?? []).filter(binding => binding.binding === 'PUBLIC_COMMUNITY_SOURCE_R2'),
+    [{ binding: 'PUBLIC_COMMUNITY_SOURCE_R2', bucket_name: 'locally-public-community-originals' }],
+    'Production release must preserve PUBLIC_COMMUNITY_SOURCE_R2 and its authoritative bucket.'
+  );
 
   const observability = production.observability ?? {};
   const samplingRate = observability.head_sampling_rate;

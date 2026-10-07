@@ -138,6 +138,10 @@ assert.deepEqual(wrangler.env.production.r2_buckets, [
     binding: manifest.bindings.publicHostProfileSourceR2,
     bucket_name: manifest.environments.production.publicHostProfileSourceR2,
   },
+  {
+    binding: manifest.bindings.publicCommunitySourceR2,
+    bucket_name: manifest.environments.production.publicCommunitySourceR2,
+  },
 ]);
 assert.deepEqual(wrangler.env.production.queues, {
   producers: [
@@ -179,6 +183,7 @@ assert.deepEqual(wrangler.env.production.triggers, {
     manifest.cancelPendingBookingsReleasePolicy.cron,
   ],
 });
+assert.equal(wrangler.env.production.vars.COMMUNITY_R2_SOURCE_ENABLED, 'true');
 assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_QUEUE_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.EXPERIENCE_TRANSLATION_SCHEDULED_RECOVERY_ENABLED, 'false');
 assert.equal(wrangler.env.production.vars.HOME_POPULARITY_SNAPSHOT_SCHEDULED_ENABLED, 'false');
