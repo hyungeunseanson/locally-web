@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
+import { testMonitorRecency } from './test-admin-monitor-recency-native.mjs';
 import { sourceLoader, response } from '../../tests/unit/helpers/chatRuntime.mjs';
 const modules = process.env.RECENCY_PG17_MODULES;
 if (!modules) throw Error('Set RECENCY_PG17_MODULES to external embedded-postgres@17 / pg node_modules');
@@ -69,7 +70,7 @@ try {
   const calls=[];
   const rpc=async(name,args)=>{
     calls.push({rpc:name,args});
-    const contract={list_admin_support_recency:['p_offset','p_limit','p_status','p_inquiry_ids'],list_admin_phone_recency:['p_offset','p_limit'],get_admin_inquiry_activity:['p_inquiry_ids'],get_admin_phone_activity:['p_inquiry_ids']}[name];
+    const contract={list_admin_monitor_recency:['p_offset','p_limit','p_inquiry_ids'],list_admin_support_recency:['p_offset','p_limit','p_status','p_inquiry_ids'],list_admin_phone_recency:['p_offset','p_limit'],get_admin_inquiry_activity:['p_inquiry_ids'],get_admin_phone_activity:['p_inquiry_ids']}[name];
     if(!contract)throw Error(`Unexpected RPC ${name}`);
     return {data:(await db.query(`SELECT * FROM public.${name}(${contract.map((_,n)=>'$'+(n+1)).join(',')})`,contract.map(key=>args[key]??null))).rows,error:null};
   };
@@ -191,5 +192,6 @@ try {
     await db.query('BEGIN');await db.query('DROP INDEX admin_chat_visible_message_recency');const unindexed=await explain();await db.query('ROLLBACK');assert.match(JSON.stringify(unindexed),/\"Node Type\":\"Sort\"/);
     console.log('EXPLAIN_COMPARISON',JSON.stringify({postgres:17,indexedMs:indexed['Execution Time'],unindexedMs:unindexed['Execution Time'],indexed:indexed.Plan,unindexed:unindexed.Plan}));
   });
+  await testMonitorRecency({db,check,client,load,customer,admin,add,definitions});
   console.log(JSON.stringify({result:'PASS',postgres:17,checks:passed.length,productionMutations:0}));
 } finally {if(db)await db.end();await pg.stop().catch(()=>{});await rm(dir,{recursive:true,force:true});}

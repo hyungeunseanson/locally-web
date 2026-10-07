@@ -15,7 +15,7 @@ import { createAdminClient } from '@/app/utils/supabase/admin';
 import { resolveAdminAccess } from '@/app/utils/adminAccess';
 import { getAdminInquiryActivity } from '@/app/utils/adminInquiryActivity';
 import { getHostPublicProfile } from '@/app/utils/profile';
-import { filteredPage, linkedRequests, validLinkedRequest, restoreCanonicalOrder, supportRecency } from '../customer-support/queries';
+import { filteredPage, linkedRequests, validLinkedRequest, restoreCanonicalOrder, supportRecency, monitorRecency } from '../customer-support/queries';
 
 // `useChat`에서 사용하던 Profile/HostApp 인터페이스
 type ProfileRow = {
@@ -110,6 +110,8 @@ export async function GET(request: Request) {
       selected = data as InquiryListRow;
       if (isAdminSupportInquiry(selected.type)) {
         selected = restoreCanonicalOrder(await supportRecency(supabaseAdmin, 0, null, [selectedId]), [selected])[0] ?? selected;
+      } else {
+        selected = restoreCanonicalOrder(await monitorRecency(supabaseAdmin, 0, [selectedId]), [selected])[0] ?? selected;
       }
       const linked = validLinkedRequest(selected, await linkedRequests(supabaseAdmin, [String(selected.id)]));
       selection = linked ? { view: 'phone', proxyRequestId: linked.id }
@@ -117,25 +119,15 @@ export async function GET(request: Request) {
     }
     const page = params.get('resolveOnly') === 'true' ? { data: [], pagination: { offset, limit, hasMore: false } }
       : await filteredPage(async scan => {
-        let rows: InquiryListRow[];
-        if (view === 'support') {
-          const order = await supportRecency(supabaseAdmin, scan, status);
-          if (!order.length) return [];
-          const { data, error } = await supabaseAdmin.from('inquiries').select(columns).in('id', order.map(row => row.id))
-            .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
-            .limit(1, { referencedTable: 'inquiry_messages' });
-          if (error) throw error;
-          rows = restoreCanonicalOrder(order, data as InquiryListRow[]);
-        } else {
-          // Monitor global pagination hardening remains outside Phase A.
-          const { data, error } = await supabaseAdmin.from('inquiries').select(columns)
-            .or('type.is.null,type.not.in.(admin,admin_support)')
-            .order('updated_at', { ascending: false }).order('id', { ascending: false })
-            .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
-            .limit(1, { referencedTable: 'inquiry_messages' }).range(scan, scan + 99);
-          if (error) throw error;
-          rows = data as InquiryListRow[];
-        }
+        const order = view === 'support'
+          ? await supportRecency(supabaseAdmin, scan, status)
+          : await monitorRecency(supabaseAdmin, scan);
+        if (!order.length) return [];
+        const { data, error } = await supabaseAdmin.from('inquiries').select(columns).in('id', order.map(row => row.id))
+          .order('created_at', { referencedTable: 'inquiry_messages', ascending: false })
+          .limit(1, { referencedTable: 'inquiry_messages' });
+        if (error) throw error;
+        const rows = restoreCanonicalOrder(order, data as InquiryListRow[]);
         const ids = rows.map(row => String(row.id));
         const [links, activities] = await Promise.all([
           view === 'support' ? linkedRequests(supabaseAdmin, ids) : Promise.resolve([]),
@@ -146,6 +138,7 @@ export async function GET(request: Request) {
           matchesOperations: !filterActivity || matchesChatOperations(activities.get(String(row.id)) ?? {}, operations) }));
       }, row => !row.phoneLinked && row.matchesOperations, offset, limit);
     const inquiryRows: InquiryListRow[] = page.data.map(item => item.row);
+    const canonicalPageIds = new Set(inquiryRows.map(row => String(row.id)));
     if (selected && selection?.view === view && !inquiryRows.some(row => String(row.id) === String(selected.id))) inquiryRows.unshift(selected);
     if (inquiryRows.length === 0) {
       return NextResponse.json({ success: true, data: [], selection, pagination: page.pagination });
@@ -231,7 +224,12 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ success: true, data: safeData, selection, pagination: page.pagination }, { headers: { 'Cache-Control': 'private, no-store' } });
+    // Monitor deep-link metadata is separate from the canonical page. Selecting
+    // an old off-page thread must not insert it into the pagination prefix.
+    return NextResponse.json({ success: true,
+      data: view === 'monitor' ? safeData.filter(row => canonicalPageIds.has(String(row.id))) : safeData,
+      ...(view === 'monitor' ? { resolvedInquiry: selected && selection?.view === view ? safeData.find(row => String(row.id) === String(selected.id)) ?? null : null } : {}),
+      selection, pagination: page.pagination }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: unknown) {
     console.error('[inquiries/list] error:', error);
     const message = error instanceof Error ? error.message : 'Server error';

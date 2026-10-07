@@ -96,6 +96,14 @@ export async function supportRecency(db: SupabaseClient, offset: number, status:
   return data as CanonicalRecencyRow[];
 }
 
+export async function monitorRecency(db: SupabaseClient, offset: number, inquiryIds: string[] | null = null) {
+  const { data, error } = await db.rpc('list_admin_monitor_recency', {
+    p_offset: offset, p_limit: BATCH, p_inquiry_ids: inquiryIds,
+  });
+  if (error) throw error;
+  return data as CanonicalRecencyRow[];
+}
+
 // Bound each DB read, but never truncate the searchable universe at 100 rows.
 // Filtering precedes response pagination; only one matching page reaches the browser.
 export async function filteredPage<T>(readBatch: (offset: number) => Promise<T[]>, matches: (row: T) => boolean, offset: number, limit: number) {

@@ -234,7 +234,14 @@ expectedLedger.push({
   "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd",
   "repositoryVersion": "20261006173453"
 });
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261007024725",
+    "name": "admin_chat_monitor_canonical_recency",
+    "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
+    "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
