@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 9,
+  "schemaContractVersion": 10,
   "capturedAt": "2026-10-06T18:11:30.367161+00:00",
   "productionProjectRef": "uhinvcydgzqlpnvieyal",
   "source": {
@@ -202,6 +202,14 @@
       "repositorySha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd",
       "repositoryVersion": "20261006173453",
       "ledgerStatementsSha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
+    },
+    {
+      "version": "20261007024725",
+      "name": "admin_chat_monitor_canonical_recency",
+      "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
+      "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26",
+      "repositoryVersion": "20261007024725",
+      "ledgerStatementsSha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
     }
   ],
   "operationalStateDeltas": [
@@ -333,6 +341,7 @@
       "public.increment_like_count()",
       "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer)",
       "public.lease_experience_translation_task(p_provider text, p_now timestamp with time zone, p_lease_seconds integer, p_reserved_tokens integer)",
+      "public.list_admin_monitor_recency(p_offset integer, p_limit integer, p_inquiry_ids bigint[])",
       "public.list_admin_phone_recency(p_offset integer, p_limit integer)",
       "public.list_admin_support_recency(p_offset integer, p_limit integer, p_status text, p_inquiry_ids bigint[])",
       "public.list_due_experience_completion_candidates(p_booking_id text)",
@@ -1306,14 +1315,7 @@
     "resultLimit": 25,
     "lockTimeout": "2s"
   },
-  "pendingProductionMigrations": [
-    {
-      "version": "20261007024725",
-      "name": "admin_chat_monitor_canonical_recency",
-      "repositoryFile": "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
-      "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"
@@ -3469,5 +3471,48 @@
         "statementsSha256": "d54cc40925172e495631b44ad55d47092a5affafd6af15f9a569aad7f9076cfd"
       }
     ]
+  },
+  "adminMonitorRecency": {
+    "functions": [
+      {
+        "acl": "{postgres=X/postgres,service_role=X/postgres}",
+        "bodyMd5": "caea0b27c619d17e52f6feccf22cbfa2",
+        "configuration": [
+          "search_path=\"\""
+        ],
+        "identity": "public.list_admin_monitor_recency(p_offset integer, p_limit integer, p_inquiry_ids bigint[])",
+        "owner": "postgres",
+        "result": "TABLE(id text, canonical_activity_at timestamp with time zone)",
+        "securityDefiner": false,
+        "volatility": "s"
+      }
+    ],
+    "index": {
+      "definition": "CREATE INDEX admin_chat_visible_message_recency ON public.inquiry_messages USING btree (inquiry_id, created_at DESC, id DESC) WHERE (COALESCE(type, 'text'::text) = ANY (ARRAY['text'::text, 'image'::text]))",
+      "name": "admin_chat_visible_message_recency",
+      "predicate": "(COALESCE(type, 'text'::text) = ANY (ARRAY['text'::text, 'image'::text]))",
+      "primary": false,
+      "ready": true,
+      "schema": "public",
+      "table": "inquiry_messages",
+      "unique": false,
+      "valid": true
+    },
+    "ledgerEvidence": [
+      {
+        "name": "admin_chat_monitor_canonical_recency",
+        "statementCount": 1,
+        "statementsMd5": "1b414ef098c88814ce9c37dd27114f86",
+        "statementsSha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26",
+        "version": "20261007024725"
+      }
+    ],
+    "catalogCapturedAt": "2026-10-07T03:45:59.966614+00:00",
+    "publicRpcExecuteRoles": [
+      "service_role"
+    ],
+    "maximumBatch": 100,
+    "existingFunctionsPreserved": 144,
+    "productionBusinessWrites": 0
   }
 }

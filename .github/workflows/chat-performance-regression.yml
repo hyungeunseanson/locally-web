@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      # Applied chat catalog bookkeeping must run the same regression gates.
+      - 'supabase/staging/**'
+      - 'scripts/supabase/*current-state*'
+      - '.github/workflows/chat-performance-regression.yml'
       - 'app/hooks/useChat.ts'
       - 'app/api/inquiries/**'
       - 'app/guest/inbox/**'

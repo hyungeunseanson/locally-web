@@ -830,6 +830,14 @@ BEGIN
 END;
 $admin_monitor_recency_target_contract$;
 
+-- Applied Monitor catalog only; no business mutation RPC calls.
+DO $admin_monitor_recency_catalog_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')|'||pg_get_userbyid(p.proowner)||'|'||p.prosecdef::text||'|'||p.provolatile::text||'|'||pg_get_function_result(p.oid)||'|'||array_to_string(p.proconfig,',')||'|'||p.proacl::text||'|'||md5(p.prosrc) ORDER BY p.proname,pg_get_function_identity_arguments(p.oid)) INTO actual FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='list_admin_monitor_recency';
+  IF actual IS DISTINCT FROM ARRAY['public.list_admin_monitor_recency(p_offset integer, p_limit integer, p_inquiry_ids bigint[])|postgres|false|s|TABLE(id text, canonical_activity_at timestamp with time zone)|search_path=""|{postgres=X/postgres,service_role=X/postgres}|caea0b27c619d17e52f6feccf22cbfa2']::text[] THEN RAISE EXCEPTION 'Monitor function body or ACL mismatch'; END IF;
+END $admin_monitor_recency_catalog_contract$;
+
 SELECT 'LOCALLY_STAGING_SCHEMA_CONTRACT_PASS' AS result;
 
 ROLLBACK;

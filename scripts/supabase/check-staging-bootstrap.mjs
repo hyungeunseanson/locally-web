@@ -76,8 +76,9 @@ const expectedAppliedOrder = [
   'supabase/migrations/20261006105322_community_media_authority.sql',
   'supabase/migrations/20261006133015_admin_chat_canonical_recency.sql',
   'supabase/migrations/20261006173453_community_freeze_safeupdate.sql',
+  'supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql',
 ];
-const expectedPendingOrder = ['supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql'];
+const expectedPendingOrder = [];
 const expectedApplyOrder = [...expectedAppliedOrder, ...expectedPendingOrder];
 exact('fresh-project apply order', required.freshProjectApplyOrder, expectedApplyOrder);
 exact(
@@ -199,7 +200,10 @@ if (!communityAssertions || !schemaContract.includes(communityAssertions) || sch
 
 const monitorTarget = await readFile(resolve(root, 'supabase/staging/admin-monitor-recency-target-contract.sql'), 'utf8');
 const monitorAssertions = monitorTarget.match(/DO \$admin_monitor_recency_target_contract\$[\s\S]*?\$admin_monitor_recency_target_contract\$;/)?.[0];
-if (!monitorAssertions || !schemaContract.includes(monitorAssertions) || currentContract.includes(monitorAssertions)
-  || !monitorTarget.startsWith('-- Fresh-project target') || !monitorTarget.includes('BEGIN READ ONLY;') || !monitorTarget.trimEnd().endsWith('ROLLBACK;')) {
-  fail('pending Monitor target must remain separate from applied Production evidence');
+if (!monitorAssertions || !schemaContract.includes(monitorAssertions) || !currentContract.includes(monitorAssertions)
+  || !monitorTarget.startsWith('-- Applied Monitor catalog security') || !monitorTarget.includes('BEGIN READ ONLY;') || !monitorTarget.trimEnd().endsWith('ROLLBACK;')) {
+  fail('applied Monitor security must be shared by current-state and fresh-project contracts');
 }
+
+const monitorCatalog = currentContract.match(/DO \$admin_monitor_recency_catalog_contract\$[\s\S]*?\$admin_monitor_recency_catalog_contract\$;/)?.[0];
+if (!monitorCatalog || !schemaContract.includes(monitorCatalog) || schemaContract.includes('$admin_monitor_recency_ledger_contract$')) fail('Monitor catalog/Production ledger separation differs');
