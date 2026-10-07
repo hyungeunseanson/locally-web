@@ -1,5 +1,5 @@
 {
-  "schemaContractVersion": 10,
+  "schemaContractVersion": 11,
   "productionProjectRefsDeniedForFixtureWrites": [
     "uhinvcydgzqlpnvieyal"
   ],
@@ -30,16 +30,10 @@
     "supabase/migrations/20261006105322_community_media_authority.sql",
     "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
     "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
-    "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql"
+    "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
+    "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261007052144",
-      "name": "solo_refund_provider_ledger_reconciliation",
-      "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
-      "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",
@@ -115,6 +109,7 @@
     "cancel_expired_pending_bookings_atomic",
     "cancel_pending_service_concierge_atomic",
     "canonical_experience_media_locator",
+    "canonical_solo_ledger_json",
     "capture_phone_followup",
     "check_rate_limit",
     "claim_booking_cancellation_atomic",
@@ -196,6 +191,7 @@
     "prune_team_workspace_comments",
     "prune_team_workspace_tasks",
     "reconcile_solo_refund_accepted_atomic",
+    "reconcile_solo_refund_provider_ledger_accepted_atomic",
     "reconcile_solo_refund_rejected_atomic",
     "record_media_deletion_step",
     "record_solo_refund_outcome_atomic",
@@ -436,7 +432,8 @@
     "private.host_profile_auth_cas",
     "private.host_profile_operation_context",
     "private.host_profile_source_authority",
-    "private.phone_followup_tasks"
+    "private.phone_followup_tasks",
+    "private.solo_refund_provider_ledger_evidence"
   ],
   "selectiveProductionRollout": {
     "allowedVersions": [
