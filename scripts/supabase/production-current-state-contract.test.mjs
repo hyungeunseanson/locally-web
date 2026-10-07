@@ -66,6 +66,16 @@ try {
     staticDriftChecks++;
     if (restore === null) await rm(path); else await writeFile(path,restore);
   };
+  const pending = JSON.parse(originalManifest).pendingProductionMigrations[0];
+  assert.equal(pending.version,'20261007052144');
+  const removedPending=JSON.parse(originalManifest);removedPending.pendingProductionMigrations=[];
+  await drift(manifestPath,removedPending,/manifest pending migration state differs/,originalManifest);
+  const claimedApplied=JSON.parse(originalManifest);claimedApplied.migrationLedger.push(pending);claimedApplied.pendingProductionMigrations=[];
+  await drift(manifestPath,claimedApplied,/migration versions differs/,originalManifest);
+  const relaxedPending=JSON.parse(originalRequired);relaxedPending.pendingProductionMigrations=[];
+  await drift(requiredPath,relaxedPending,/pending Production migration contract differs/,originalRequired);
+  const pendingPath=join(repoFixture,pending.repositoryFile),pendingBytes=await readFile(pendingPath,'utf8');
+  await drift(pendingPath,pendingBytes+'\n-- altered pending authority\n',/prepared migration bytes differ/,pendingBytes);
   const pendingP0 = JSON.parse(originalManifest);
   pendingP0.pendingProductionMigrations=[pendingP0.migrationLedger.pop()];
   await drift(manifestPath,pendingP0,/migration versions differs/,originalManifest);

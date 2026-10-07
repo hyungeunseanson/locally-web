@@ -241,7 +241,14 @@ expectedLedger.push({
   "repositorySha256": "45c0bab11645eddb75edc18f04ab027b9f1e9c253af41f6408855cecfd5a6e26",
   "repositoryVersion": "20261007024725"
 });
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261007052144",
+    "name": "solo_refund_provider_ledger_reconciliation",
+    "repositoryFile": "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
+    "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];
