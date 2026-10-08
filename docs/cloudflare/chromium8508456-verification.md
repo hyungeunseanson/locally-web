@@ -38,7 +38,9 @@ re-signing, changing Gatekeeper or falling back.
 ## Real CI and isolation
 
 `Experimental Release Browser Identity` keeps the Ubuntu mock rejection contracts
-and adds `real-patched-browser` on `macos-15`. GitHub documents this label as
+and adds `real-patched-browser` on `macos-15`. Ubuntu provisions the unchanged
+Playwright bundled browser because some existing protection contracts use actual
+local browser fixtures; this is a separate job, never a CfT fallback. GitHub documents this label as
 [ARM64 for public and private repositories](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 The job checks Darwin/ARM64 before downloading or launching; it also checks Mach-O
 architecture and the actual browser process through CDP process info and the native `sample` Code Type.

@@ -34,6 +34,8 @@ jobs:
         run: npx eslint scripts/cloudflare/*chromium8508456*.mjs scripts/cloudflare/verify-pinned-release-browser*.mjs scripts/cloudflare/chromium8508456-fixture
       - run: git diff --check
 
+      - name: Provision the unchanged bundled browser for existing contract fixtures
+        run: npx playwright install --with-deps chromium
       - name: Preserve existing candidate and production browser contracts
         run: node --test scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs
 
