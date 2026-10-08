@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-10-08T15:43:58.807375+00:00",
+  "fixCommit": "62473ad0f747e245e514c93e741bb8e168a2a207",
+  "binaryRevision": "6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42",
+  "ancestry": {
+    "status": "PASS",
+    "method": "GitHub official Chromium mirror compare API merge-base exact equality",
+    "base": "62473ad0f747e245e514c93e741bb8e168a2a207",
+    "mergeBase": "62473ad0f747e245e514c93e741bb8e168a2a207",
+    "statusReported": "ahead",
+    "aheadBy": 558,
+    "fetch": {
+      "url": "https://api.github.com/repos/chromium/chromium/compare/62473ad0f747e245e514c93e741bb8e168a2a207...6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42",
+      "status": 200,
+      "bytes": 1951510,
+      "sha256": "e242cdf3f40cb49f8832bfc01caa965806a13ebce73d91f647d1a8eaa87df7ce"
+    }
+  },
+  "sourceOrderComparison": {
+    "patched": {
+      "url": "https://raw.githubusercontent.com/chromium/chromium/6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42/third_party/blink/renderer/platform/loader/fetch/response_body_loader.cc",
+      "status": 200,
+      "bytes": 22017,
+      "sha256": "47c5c32c1ef1a381fb182f5bb4cd9f0dfe373bede4adcc0b6a58286f91e5ad1a",
+      "revision": "6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42",
+      "preClientHandleResult": true,
+      "onStateChangeExcerpt": "void OnStateChange() override {\n    DCHECK(!in_on_state_change_);\n    DCHECK(!has_pending_state_change_signal_);\n    DCHECK(!waiting_for_lookahead_bytes_);\n    base::AutoReset<bool> auto_reset_for_in_on_state_change(\n        &in_on_state_change_, true);\n    base::AutoReset<bool> auto_reset_for_has_pending_state_change_signal(\n        &has_pending_state_change_signal_, false);\n    base::AutoReset<bool> auto_reset_for_waiting_for_lookahead_bytes(\n        &waiting_for_lookahead_bytes_, false);\n\n    // Do not proceed to read the data if loader is aborted, suspended for non\n    // back/forward cache reason, or the state is cancelled.\n    if (loader_->IsAborted() || IsSuspendedButNotForBackForwardCache() ||\n        state_ == State::kCancelled) {\n      return;\n    }\n\n    // Proceed to read the data, even if in back/forward cache.\n    while (state_ == State::kLoading) {\n      // Peek available bytes from |bytes_consumer_| and report them to\n      // |loader_|.\n      base::span<const char> buffer;\n      // Possible state change caused by BeginRead will be realized by the\n      // following logic, so we don't need to worry about it here.\n      auto result = bytes_consumer_->BeginRead(buffer);\n      if (result == Result::kOk) {\n        if (lookahead_bytes_ < buffer.size()) {\n          loader_->DidReceiveData(buffer.subspan(lookahead_bytes_));\n          lookahead_bytes_ = buffer.size();\n        }\n        // Possible state change caused by EndRead will be realized by the\n        // following logic, so we don't need to worry about it here.\n        result = bytes_consumer_->EndRead(0);\n      }\n      waiting_for_lookahead_bytes_ = false;\n      if ((result == Result::kOk || result == Result::kShouldWait) &&\n          lookahead_bytes_ == 0) {\n        // We have no information to notify the client.\n        break;\n      }\n      // Record the terminal state before notifying the client, which may\n      // Cancel() on seeing it.\n      HandleResult(result);\n      if (bytes_consumer_client_) {\n        bytes_consumer_client_->OnStateChange();\n      }\n      if (!waiting_for_lookahead_bytes_) {\n        break;\n      }\n    }\n\n    switch (GetPublicState()) {\n      case PublicState::kReadableOrWaiting:\n        break;\n      case PublicState::kClosed:\n        HandleResult(Result::kDone);\n        break;\n      case PublicState::kErrored:\n        HandleResult(Result::kError);\n        break;\n    }\n\n    if (has_pending_state_change_signal_) {\n      switch (state_) {\n        case State::kLoading:\n          NOTREACHED();\n        case State::kDone:\n          loader_->DidFinishLoadingBody();\n          break;\n        case State::kErrored:\n          loader_->DidFailLoadingBody();\n          break;\n        case State::kCancelled:\n          CancelSync();\n          break;\n      }\n    }\n  }\n\n"
+    }
+  },
+  "fixInExactBinarySource": "PASS",
+  "qualification": "Exact runtime revision and Git/source ancestry verified; Chromium 147 vs 157 includes other upstream changes, not an isolated same-revision source bisect."
+}

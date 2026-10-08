@@ -3,7 +3,9 @@ name: Experimental Release Browser Identity
 on:
   pull_request:
     paths:
-      - 'scripts/cloudflare/chromium8508456-profile.json'
+      - 'scripts/cloudflare/chromium8508456*'
+      - 'scripts/cloudflare/download-chromium8508456-ci.mjs'
+      - 'scripts/cloudflare/run-chromium8508456-ci.mjs'
       - 'scripts/cloudflare/verify-pinned-release-browser*'
       - 'docs/cloudflare/chromium8508456-verification.md'
       - '.github/workflows/release-browser-identity-check.yml'
@@ -22,9 +24,48 @@ jobs:
         with:
           node-version: 24.20.0
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Reject wrong platform, bytes, API version and runtime identity
         run: node --test scripts/cloudflare/verify-pinned-release-browser.test.mjs
       - name: Lint diagnostic helpers
-        run: npx eslint scripts/cloudflare/verify-pinned-release-browser.mjs scripts/cloudflare/verify-pinned-release-browser.test.mjs
+        run: npx eslint scripts/cloudflare/*chromium8508456*.mjs scripts/cloudflare/verify-pinned-release-browser*.mjs scripts/cloudflare/chromium8508456-fixture
       - run: git diff --check
+
+      - name: Preserve existing candidate and production browser contracts
+        run: node --test scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs
+
+  real-patched-browser:
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Fail before browser execution unless runner is native ARM64
+        run: |
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test "$RUNNER_ARCH" = ARM64
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - name: Install locked API dependencies without production credentials
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Acquire only the fixed official Google archive and verify before extraction
+        run: |
+          mkdir -p "$RUNNER_TEMP/chromium8508456-evidence"
+          node scripts/cloudflare/download-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
+      - name: Execute real normal streams, Next Flight, negatives and unchanged synthetic Gate
+        run: node scripts/cloudflare/run-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
+      - name: Retain sanitized local-only browser receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: chromium8508456-real-browser-evidence
+          path: ${{ runner.temp }}/chromium8508456-evidence/*.json
+          if-no-files-found: error
+          retention-days: 14
