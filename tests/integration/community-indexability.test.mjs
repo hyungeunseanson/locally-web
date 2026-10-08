@@ -197,11 +197,15 @@ for (const missing of [[], ['board_country'], ['is_anonymous'], ['destination_hu
         assert.equal(metadata.alternates.canonical, `https://www.locally-travel.com/community/${id}`);
         const html = renderToStaticMarkup(await page.default(props(id, query)));
         assert.equal(html.includes('"@type":"Article"'), indexable, `${name}: Article matches robots/sitemap`);
-        if (result.post.is_anonymous === true) {
+        const authorHidden = result.post.is_anonymous === true
+          || (missing.includes('is_anonymous') && name !== 'content');
+        if (authorHidden) {
           assert.equal(result.profile, null);
           assert(!html.includes('PRIVATE_AUTHOR_MARKER'));
           assert(!html.includes('PRIVATE_AVATAR_MARKER'));
           assert(!html.includes(authorId));
+        } else {
+          assert.equal(result.profile?.full_name, 'PRIVATE_AUTHOR_MARKER', 'Confirmed named posts and admin content retain their public author');
         }
       }
     }
@@ -298,8 +302,10 @@ for (const missing of [[], ['board_country', 'is_anonymous']]) {
           assert.equal(snapshot.article, sitemapIds.includes(id));
           if (baseline) assert.deepEqual(snapshot, baseline, `${name} query invariant`);
           baseline = snapshot;
-          if (name === 'anonymous') {
+          if (name === 'anonymous' || (missing.length && name !== 'content')) {
             for (const privateValue of [authorId, 'PRIVATE_AUTHOR_MARKER', 'PRIVATE_AVATAR_MARKER']) assert(!html.includes(privateValue));
+          } else {
+            assert(html.includes('PRIVATE_AUTHOR_MARKER'), 'Existing public author contract is retained');
           }
         }
       }

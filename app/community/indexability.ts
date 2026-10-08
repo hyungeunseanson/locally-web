@@ -22,6 +22,14 @@ export function isCommunityPostIndexable(post: CommunityIndexabilityFields): boo
   return post.category === 'qna' && post.is_anonymous === false && getCommunityPostBoard(post) !== null;
 }
 
+export function shouldHideCommunityPostAuthor(post: CommunityIndexabilityFields): boolean {
+  if (post.is_anonymous === true) return true;
+  // The legacy writer can drop a requested anonymous flag when its column is absent.
+  // Ordinary legacy rows therefore cannot prove permission to publish author identity.
+  // Admin-only locally_content is explicitly nonanonymous under the existing writer.
+  return post.is_anonymous !== false && post.category !== 'locally_content';
+}
+
 export function normalizeCommunityPost<T extends CommunityIndexabilityFields>(post: T) {
   return {
     ...post,

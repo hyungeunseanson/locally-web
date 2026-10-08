@@ -10,7 +10,7 @@ import {
   type CommunityFeedLinkedExperienceRow,
 } from './feedSelect';
 import { getLegacyHubSeedForBoard } from './boardMeta';
-import { getMissingCommunityCompatibilityColumn, normalizeCommunityPost } from './indexability';
+import { getMissingCommunityCompatibilityColumn, normalizeCommunityPost, shouldHideCommunityPostAuthor } from './indexability';
 
 export type CommunityDetailPostRow = {
   id: string;
@@ -113,7 +113,7 @@ async function getCommunityDetailPostUncached(id: string) {
   }
 
   const [profileResult, experienceResult] = await Promise.all([
-    post.is_anonymous === true ? Promise.resolve({ data: null, error: null }) : supabase
+    shouldHideCommunityPostAuthor(post) ? Promise.resolve({ data: null, error: null }) : supabase
       .from('public_profiles')
       .select('id, full_name, avatar_url')
       .eq('id', post.user_id)

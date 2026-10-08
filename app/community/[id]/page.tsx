@@ -18,7 +18,7 @@ import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
 import { resolveCommunityBoard } from '../boardMeta';
-import { getCommunityPostBoard, isCommunityPostIndexable } from '../indexability';
+import { getCommunityPostBoard, isCommunityPostIndexable, shouldHideCommunityPostAuthor } from '../indexability';
 import { getCommunityHubMeta } from '../hubMeta';
 import { buildCommunityBoardDetailHref, buildCommunityBoardListHref, resolveCommunitySort } from '../queryParams';
 import { resolveCommunityHub } from '../legacyQueryParams';
@@ -111,7 +111,7 @@ export default async function CommunityPostDetail({
     const initialBoardContext = post.board_country ?? requestedBoard;
     const isBoardPost = Boolean(initialBoardContext);
     const isSearchIndexable = isCommunityPostIndexable(post);
-    const isAnonymous = post.is_anonymous === true;
+    const isAnonymous = shouldHideCommunityPostAuthor(post);
     const authorName = getCommunityAuthorName(profile, isAnonymous);
     const authorInitial = getCommunityAuthorInitial(profile, isAnonymous);
     const authorAvatar = getCommunityAuthorAvatar(profile, isAnonymous);
