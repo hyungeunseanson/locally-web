@@ -134,7 +134,8 @@
     "storage:community:runtime": "node scripts/cloudflare/test-community-media-runtime.mjs && node scripts/cloudflare/test-community-readers-runtime.mjs",
     "storage:community:native": "node scripts/supabase/test-community-media-native.mjs",
     "storage:community:freeze-safeupdate:native": "node scripts/supabase/test-community-freeze-safeupdate-native.mjs",
-    "test:seo:sitemap": "node --test tests/integration/sitemap-recovery.test.mjs"
+    "test:seo:sitemap": "node --test tests/integration/sitemap-recovery.test.mjs",
+    "test:seo:community": "node --test tests/integration/community-indexability.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

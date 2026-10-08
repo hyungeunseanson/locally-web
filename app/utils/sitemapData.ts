@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { isMissingCommunityBoardColumnError } from '../community/anonymousColumn';
+import { getMissingCommunityCompatibilityColumn, normalizeCommunityPost, type CommunityCompatibilityColumn } from '../community/indexability';
 
 const PAGE_SIZE = 500;
 type SitemapSource = 'experiences' | 'community_posts' | 'public_host_applications';
@@ -15,6 +15,7 @@ export type SitemapCommunityPost = IdentifiedRow & {
   category: string | null;
   board_country: string | null;
   destination_hub: string | null;
+  is_anonymous: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -29,7 +30,7 @@ export class SitemapDataError extends Error {
   constructor(
     readonly source: SitemapSource,
     readonly code: string,
-    readonly missingBoardColumn = false,
+    readonly missingCommunityColumn: CommunityCompatibilityColumn | null = null,
   ) {
     super(`Sitemap data unavailable: ${source} (${code})`);
     this.name = 'SitemapDataError';
@@ -41,7 +42,7 @@ function queryFailure(source: SitemapSource, error: unknown): SitemapDataError {
   const code = typeof rawCode === 'string' && /^[A-Z0-9_]{1,32}$/.test(rawCode)
     ? rawCode : 'QUERY_FAILED';
   return new SitemapDataError(source, code,
-    source === 'community_posts' && isMissingCommunityBoardColumnError(error));
+    source === 'community_posts' ? getMissingCommunityCompatibilityColumn(error) : null);
 }
 
 async function readAllRows<T extends IdentifiedRow>(
@@ -84,29 +85,27 @@ async function readAllRows<T extends IdentifiedRow>(
 }
 
 async function readCommunityPosts(supabase: SupabaseClient): Promise<SitemapCommunityPost[]> {
-  try {
-    return await readAllRows<SitemapCommunityPost>('community_posts', (offset) => supabase
-      .from('community_posts')
-      .select('id, category, board_country, destination_hub, created_at, updated_at', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1)
-      .returns<SitemapCommunityPost[]>());
-  } catch (error) {
-    if (!(error instanceof SitemapDataError) || !error.missingBoardColumn) throw error;
-    // Preserve the existing legacy-board fallback; this does not change indexability policy.
-    const legacy = await readAllRows<Omit<SitemapCommunityPost, 'board_country'>>('community_posts', (offset) => supabase
-      .from('community_posts')
-      .select('id, category, destination_hub, created_at, updated_at', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1)
-      .returns<Omit<SitemapCommunityPost, 'board_country'>[]>());
-    return legacy.map((post) => ({ ...post, board_country: null }));
+  let columns = ['id', 'category', 'board_country', 'destination_hub', 'is_anonymous', 'created_at', 'updated_at'];
+  for (;;) {
+    try {
+      const posts = await readAllRows<SitemapCommunityPost>('community_posts', (offset) => supabase
+        .from('community_posts')
+        .select(columns.join(', '), { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1)
+        .returns<SitemapCommunityPost[]>());
+      return posts.map(normalizeCommunityPost);
+    } catch (error) {
+      if (!(error instanceof SitemapDataError) || !error.missingCommunityColumn
+        || !columns.includes(error.missingCommunityColumn)) throw error;
+      const missingColumn = error.missingCommunityColumn;
+      columns = columns.filter((column) => column !== missingColumn);
+    }
   }
 }
 
-export async function readSitemapData(supabase: SupabaseClient) {
+export async function readSitemapData(supabase: SupabaseClient, publicCommunityClient: SupabaseClient) {
   const [experiences, communityPosts, publicHosts] = await Promise.all([
     readAllRows<SitemapExperience>('experiences', (offset) => supabase
       .from('experiences')
@@ -116,7 +115,7 @@ export async function readSitemapData(supabase: SupabaseClient) {
       .order('id', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
       .returns<SitemapExperience[]>()),
-    readCommunityPosts(supabase),
+    readCommunityPosts(publicCommunityClient),
     // Read all applications before selecting the latest, including newer nonpublic statuses.
     readAllRows<SitemapHost>('public_host_applications', (offset) => supabase
       .from('public_host_applications')

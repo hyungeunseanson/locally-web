@@ -9,12 +9,8 @@ import {
   filterVisibleCommunityLinkedExperiences,
   type CommunityFeedLinkedExperienceRow,
 } from './feedSelect';
-import {
-  isMissingAnonymousColumnError,
-  isMissingCommunityBoardColumnError,
-  isMissingCommunityModelColumnError,
-} from './anonymousColumn';
-import { getLegacyHubSeedForBoard, inferCommunityBoardFromLegacyHub } from './boardMeta';
+import { getLegacyHubSeedForBoard } from './boardMeta';
+import { getMissingCommunityCompatibilityColumn, normalizeCommunityPost, shouldHideCommunityPostAuthor } from './indexability';
 
 export type CommunityDetailPostRow = {
   id: string;
@@ -25,7 +21,7 @@ export type CommunityDetailPostRow = {
   title: string;
   content: string;
   images: string[] | null;
-  is_anonymous: boolean;
+  is_anonymous: boolean | null;
   companion_date: string | null;
   companion_city: string | null;
   linked_exp_id: number | null;
@@ -35,9 +31,6 @@ export type CommunityDetailPostRow = {
   created_at: string;
   updated_at: string | null;
 };
-
-type CommunityDetailPreBoardPostRow = Omit<CommunityDetailPostRow, 'board_country'>;
-type CommunityDetailLegacyPostRow = Omit<CommunityDetailPostRow, 'destination_hub' | 'is_anonymous' | 'board_country'>;
 
 export type CommunityDetailProfile = {
   id: string;
@@ -86,42 +79,6 @@ const COMMUNITY_DETAIL_POST_SELECT = [
   'updated_at',
 ].join(', ');
 
-const COMMUNITY_DETAIL_POST_SELECT_PRE_BOARD = [
-  'id',
-  'user_id',
-  'category',
-  'destination_hub',
-  'title',
-  'content',
-  'images',
-  'is_anonymous',
-  'companion_date',
-  'companion_city',
-  'linked_exp_id',
-  'view_count',
-  'like_count',
-  'comment_count',
-  'created_at',
-  'updated_at',
-].join(', ');
-
-const COMMUNITY_DETAIL_POST_SELECT_LEGACY = [
-  'id',
-  'user_id',
-  'category',
-  'title',
-  'content',
-  'images',
-  'companion_date',
-  'companion_city',
-  'linked_exp_id',
-  'view_count',
-  'like_count',
-  'comment_count',
-  'created_at',
-  'updated_at',
-].join(', ');
-
 const COMMUNITY_DETAIL_REVALIDATE_SECONDS = 300;
 const COMMUNITY_POST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -131,41 +88,20 @@ async function getCommunityDetailPostUncached(id: string) {
   const buildPostQuery = (selectClause: string) =>
     supabase.from('community_posts').select(selectClause).eq('id', id).maybeSingle();
 
-  const initialPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT);
-  let post = initialPostResult.data as unknown as CommunityDetailPostRow | null;
-  let postError = initialPostResult.error;
+  let columns = COMMUNITY_DETAIL_POST_SELECT.split(', ');
+  let result = await buildPostQuery(columns.join(', '));
   let usedPreBoardFallback = false;
-
-  if (postError && isMissingCommunityBoardColumnError(postError)) {
-    const preBoardResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT_PRE_BOARD);
-    const preBoardPost = preBoardResult.data as unknown as CommunityDetailPreBoardPostRow | null;
-    post = preBoardPost
-      ? {
-          ...preBoardPost,
-          board_country: inferCommunityBoardFromLegacyHub(preBoardPost.destination_hub),
-        }
-      : null;
-    postError = preBoardResult.error;
-    usedPreBoardFallback = true;
+  // At most one retry per missing optional column; retain every available privacy/board field.
+  while (result.error) {
+    const missingColumn = getMissingCommunityCompatibilityColumn(result.error);
+    if (!missingColumn || !columns.includes(missingColumn)) throw result.error;
+    columns = columns.filter((column) => column !== missingColumn);
+    if (missingColumn === 'board_country') usedPreBoardFallback = true;
+    result = await buildPostQuery(columns.join(', '));
   }
-
-  if (postError && (isMissingAnonymousColumnError(postError) || isMissingCommunityModelColumnError(postError))) {
-    const legacyPostResult = await buildPostQuery(COMMUNITY_DETAIL_POST_SELECT_LEGACY);
-    const legacyPost = legacyPostResult.data as unknown as CommunityDetailLegacyPostRow | null;
-    post = legacyPost
-      ? {
-          ...legacyPost,
-          destination_hub: null,
-          board_country: null,
-          is_anonymous: false,
-        }
-      : null;
-    postError = legacyPostResult.error;
-  }
-
-  if (postError) {
-    throw postError;
-  }
+  const post = result.data
+    ? normalizeCommunityPost(result.data as unknown as CommunityDetailPostRow)
+    : null;
 
   if (!post) {
     return {
@@ -177,7 +113,7 @@ async function getCommunityDetailPostUncached(id: string) {
   }
 
   const [profileResult, experienceResult] = await Promise.all([
-    supabase
+    shouldHideCommunityPostAuthor(post) ? Promise.resolve({ data: null, error: null }) : supabase
       .from('public_profiles')
       .select('id, full_name, avatar_url')
       .eq('id', post.user_id)
@@ -242,7 +178,7 @@ export async function getCommunityDetailPost(id: string) {
 
   return unstable_cache(
     () => getCommunityDetailPostUncached(id),
-    ['community-detail', id],
+    ['community-detail-indexability-v2', id],
     {
       revalidate: COMMUNITY_DETAIL_REVALIDATE_SECONDS,
       tags: ['community-detail', `community-detail-${id}`],

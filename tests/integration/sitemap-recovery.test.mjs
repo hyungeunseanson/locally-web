@@ -16,7 +16,7 @@ const workerRuntime = process.env.SITEMAP_RUNTIME === 'opennext';
 await db.exec(`
   CREATE TABLE experiences (id bigint PRIMARY KEY, host_id text, status text, is_active boolean);
   CREATE TABLE public_host_applications (id text PRIMARY KEY, user_id text, status text, created_at timestamptz);
-  CREATE TABLE community_posts (id text PRIMARY KEY, category text, destination_hub text, created_at timestamptz, updated_at timestamptz);
+  CREATE TABLE community_posts (id text PRIMARY KEY, category text, destination_hub text, created_at timestamptz, updated_at timestamptz, is_anonymous boolean DEFAULT false);
 `);
 let requests = [];
 let fault = {};
@@ -71,11 +71,11 @@ await build({
   outfile: path.join(dir, 'sitemap.cjs'),
   plugins: [{ name: 'local-only-admin-client', setup(builder) {
     builder.onResolve({ filter: /^next\/cache$/ }, () => ({ path: 'cache', namespace: 'fixture' }));
-    builder.onResolve({ filter: /utils\/supabase\/admin$/ }, () => ({ path: 'fixture', namespace: 'fixture' }));
+    builder.onResolve({ filter: /utils\/supabase\/(admin|public-server)$/ }, () => ({ path: 'fixture', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path: kind }) => ({
       // Test each generation independently. The Next HTTP test exercises the real cache.
       contents: kind === 'cache' ? 'export const unstable_cache = fn => fn;'
-        : 'export const createAdminClient = () => globalThis.__sitemapRecoveryClient;', loader: 'js',
+        : 'export const createAdminClient = () => globalThis.__sitemapRecoveryClient; export const createPublicServerClient = createAdminClient;', loader: 'js',
     }));
   } }],
 });
@@ -135,7 +135,7 @@ async function seed() {
       (5, 'host-a', 'active', true), (6, 'host-d', 'active', true),
       (7, NULL, 'active', true), (8, 'missing-host', 'active', true),
       (9, 'host-e', 'active', true);
-    INSERT INTO community_posts VALUES
+    INSERT INTO community_posts (id, category, destination_hub, created_at, updated_at) VALUES
       ('japan', 'qna', 'tokyo', '2026-02-01', '2026-02-02'),
       ('korea', 'qna', 'seoul', '2026-02-01', NULL),
       ('content', 'locally_content', NULL, '2026-02-01', '2026-02-03'),
@@ -212,7 +212,7 @@ test('more than 1000 rows and a lower server cap do not truncate any dynamic sou
   await db.exec(`
     INSERT INTO public_host_applications SELECT 'host-' || g, 'user-' || g, 'approved', '2026-02-01' FROM generate_series(1, 1050) g;
     INSERT INTO experiences SELECT g, 'user-' || g, 'active', true FROM generate_series(1, 1025) g;
-    INSERT INTO community_posts SELECT 'post-' || g, 'locally_content', NULL, '2026-02-01', NULL FROM generate_series(1, 1010) g;
+    INSERT INTO community_posts (id, category, destination_hub, created_at, updated_at) SELECT 'post-' || g, 'locally_content', NULL, '2026-02-01', NULL FROM generate_series(1, 1010) g;
   `);
   const entries = await sitemap();
   assert.equal(entries.filter((e) => e.url.includes('/experiences/')).length, 1025);
@@ -250,10 +250,10 @@ test('a missing selected column produces an observable failure instead of static
 
 test('community fallback errors are not swallowed', async () => {
   await seed();
-  await db.exec('ALTER TABLE community_posts RENAME COLUMN destination_hub TO temporarily_missing;');
+  await db.exec('ALTER TABLE community_posts RENAME COLUMN created_at TO temporarily_missing;');
   try {
     await assert.rejects(sitemap(), (e) => e.source === 'community_posts' && e.code === '42703');
-  } finally { await db.exec('ALTER TABLE community_posts RENAME COLUMN temporarily_missing TO destination_hub;'); }
+  } finally { await db.exec('ALTER TABLE community_posts RENAME COLUMN temporarily_missing TO created_at;'); }
 });
 
 test('a failed later page cannot publish earlier pages', async () => {

@@ -7,7 +7,8 @@ import {
   pickLatestPublicHostApplicationsByUser,
 } from '@/app/utils/hostVisibility';
 import { buildAbsoluteUrl } from '@/app/utils/siteUrl';
-import { inferCommunityBoardFromLegacyHub } from '@/app/community/boardMeta';
+import { isCommunityPostIndexable } from '@/app/community/indexability';
+import { createPublicServerClient } from '@/app/utils/supabase/public-server';
 import { readSitemapData, SitemapDataError } from '@/app/utils/sitemapData';
 
 // Generate at request time so builds do not require a live Production database.
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
 const getSitemapData = unstable_cache(
   async () => {
     try {
-      return await readSitemapData(createAdminClient());
+      return await readSitemapData(createAdminClient(), createPublicServerClient());
     } catch (error) {
       console.error('[Sitemap] Generation failed', error instanceof SitemapDataError
         ? { source: error.source, code: error.code }
@@ -25,7 +26,7 @@ const getSitemapData = unstable_cache(
       throw error instanceof SitemapDataError ? error : new Error('Sitemap generation failed');
     }
   },
-  ['public-sitemap-data-v1', process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''],
+  ['public-sitemap-data-community-v2', process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''],
   { revalidate: 3600 },
 );
 
@@ -141,10 +142,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
 
   const communityUrls: MetadataRoute.Sitemap = communityPosts
-    .filter((post) => {
-      const inferredBoard = post.board_country ?? inferCommunityBoardFromLegacyHub(post.destination_hub);
-      return post.category === 'locally_content' || inferredBoard === 'japan' || inferredBoard === 'korea';
-    })
+    .filter(isCommunityPostIndexable)
     .map((post) => ({
       url: buildAbsoluteUrl(`/community/${post.id}`),
       lastModified: new Date(post.updated_at || post.created_at || new Date()),
