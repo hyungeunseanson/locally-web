@@ -135,7 +135,8 @@
     "storage:community:native": "node scripts/supabase/test-community-media-native.mjs",
     "storage:community:freeze-safeupdate:native": "node scripts/supabase/test-community-freeze-safeupdate-native.mjs",
     "test:seo:sitemap": "node --test tests/integration/sitemap-recovery.test.mjs",
-    "test:seo:community": "node --test tests/integration/community-indexability.test.mjs"
+    "test:seo:community": "node --test tests/integration/community-indexability.test.mjs",
+    "test:host-prefetch": "node --test tests/unit/site-header-prefetch.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

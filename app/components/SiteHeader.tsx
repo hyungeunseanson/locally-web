@@ -95,8 +95,14 @@ function SiteHeaderContent() {
 
   useEffect(() => {
     router.prefetch('/account');
-    router.prefetch(hostReservationsHref);
-  }, [hostReservationsHref, router]);
+  }, [router]);
+
+  useEffect(() => {
+    // Match the resolved Host switch eligibility, including applicants.
+    if (!isLoading && canUseHostView) {
+      router.prefetch(hostReservationsHref);
+    }
+  }, [canUseHostView, hostReservationsHref, isLoading, router]);
 
   useEffect(() => {
     return () => {

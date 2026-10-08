@@ -75,6 +75,9 @@ jobs:
       - name: Run Auth regression gate
         run: npm run test:e2e:auth-regression
 
+      - name: Preserve resolved Host and applicant prefetch eligibility
+        run: npm run test:host-prefetch
+
       - name: Validate the patched Next.js runtime contract
         run: npm run test:e2e:next-security-contract
 
