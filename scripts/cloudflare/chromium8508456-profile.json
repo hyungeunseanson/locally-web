@@ -1,0 +1,18 @@
+{
+  "purpose": "Experimental verification only; does not select the release Gate browser",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "playwright": "1.59.1",
+  "browserVersion": "157.0.8091.0",
+  "browserRevision": "@6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42",
+  "fixCommit": "62473ad0f747e245e514c93e741bb8e168a2a207",
+  "officialDownload": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8091.0/mac-arm64/chrome-mac-arm64.zip",
+  "archiveSHA256": "3fd0f44ec97c691eb2843c235f0aec551533d49786e1064d510e4465a7a5fec7",
+  "executableSHA256": "e6be32b024b1ed1b0ba4101d0465cd6b59cac0e1b0323b184732638218dec3ae",
+  "frameworkSHA256": "47bceeac49d1fb2f70128e18817aed959dd6a3174dffc4e5607f789527da915f",
+  "frameworkRelativePath": "../Frameworks/Google Chrome for Testing Framework.framework/Versions/157.0.8091.0/Google Chrome for Testing Framework",
+  "sourceAncestry": "https://api.github.com/repos/chromium/chromium/compare/62473ad0f747e245e514c93e741bb8e168a2a207...6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42",
+  "exactSource": "https://raw.githubusercontent.com/chromium/chromium/6532fdea9c01b64cea9c3d3d9f10c241bc3dfb42/third_party/blink/renderer/platform/loader/fetch/response_body_loader.cc",
+  "signing": "Official archive is ad-hoc signed; no Google TeamIdentifier or sealed CodeResources",
+  "compatibility": "Local empirical compatibility only; not a Playwright bundled or guaranteed supported pair"
+}
