@@ -18,6 +18,7 @@ import { buildBreadcrumbJsonLd, buildCommunityArticleJsonLd } from '@/app/utils/
 import { getCommunityAuthorAvatar, getCommunityAuthorInitial, getCommunityAuthorName } from '../authorDisplay';
 import { getCommunityCategoryMeta, isLocallyContentCategory } from '../categoryMeta';
 import { resolveCommunityBoard } from '../boardMeta';
+import { getCommunityPostBoard, isCommunityPostIndexable } from '../indexability';
 import { getCommunityHubMeta } from '../hubMeta';
 import { buildCommunityBoardDetailHref, buildCommunityBoardListHref, resolveCommunitySort } from '../queryParams';
 import { resolveCommunityHub } from '../legacyQueryParams';
@@ -26,13 +27,11 @@ import { getAdjacentCommunityPosts, getCommunityDetailPost } from '../detailData
 // 🚀 Dynamic Metadata (SSR SEO)
 export async function generateMetadata({
     params,
-    searchParams,
 }: {
     params: Promise<{ id: string }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<Metadata> {
     const { id } = await params;
-    const detailSearchParams = await searchParams;
     const { post } = await getCommunityDetailPost(id);
 
     if (!post) {
@@ -44,11 +43,8 @@ export async function generateMetadata({
     const defaultImage = post.images && post.images.length > 0 ? post.images[0] : buildAbsoluteUrl('/images/logo.png');
     const pagePath = `/community/${id}`;
     const canonicalUrl = buildAbsoluteUrl(pagePath);
-    const requestedBoard = typeof detailSearchParams?.board === 'string'
-        ? resolveCommunityBoard(detailSearchParams.board as string)
-        : null;
-    const boardContext = post.board_country ?? requestedBoard;
-    const isSearchIndexable = Boolean(boardContext) || isLocallyContentCategory(post.category);
+    const boardContext = getCommunityPostBoard(post);
+    const isSearchIndexable = isCommunityPostIndexable(post);
     const communitySurfaceLabel = 'Locally 커뮤니티';
 
     let prefix = '';
@@ -114,11 +110,12 @@ export default async function CommunityPostDetail({
     const isLocallyContent = isLocallyContentCategory(post.category);
     const initialBoardContext = post.board_country ?? requestedBoard;
     const isBoardPost = Boolean(initialBoardContext);
-    const isSearchIndexable = isBoardPost || isLocallyContent;
-    const authorName = getCommunityAuthorName(profile, post.is_anonymous);
-    const authorInitial = getCommunityAuthorInitial(profile, post.is_anonymous);
-    const authorAvatar = getCommunityAuthorAvatar(profile, post.is_anonymous);
-    const authorProfileUrl = !post.is_anonymous && post.user_id
+    const isSearchIndexable = isCommunityPostIndexable(post);
+    const isAnonymous = post.is_anonymous === true;
+    const authorName = getCommunityAuthorName(profile, isAnonymous);
+    const authorInitial = getCommunityAuthorInitial(profile, isAnonymous);
+    const authorAvatar = getCommunityAuthorAvatar(profile, isAnonymous);
+    const authorProfileUrl = !isAnonymous && post.user_id
         ? buildAbsoluteUrl(`/users/${post.user_id}`)
         : null;
     const categoryMeta = getCommunityCategoryMeta(post.category);
@@ -211,9 +208,9 @@ export default async function CommunityPostDetail({
 
                                 <div className="mb-5">
                                     <CommunityAuthorTrigger
-                                        userId={post.is_anonymous ? null : post.user_id}
+                                        userId={isAnonymous ? null : post.user_id}
                                         authorName={authorName}
-                                        isAnonymous={post.is_anonymous}
+                                        isAnonymous={isAnonymous}
                                         currentPostId={post.id}
                                         className="text-left"
                                     >

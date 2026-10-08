@@ -110,6 +110,7 @@ function loadDetail(environment, existing = false, postError = null) {
       COMMUNITY_FEED_LINKED_EXPERIENCE_SELECT: 'id, host_id, title, image_url, price',
       filterVisibleCommunityLinkedExperiences: (rows) => rows,
     },
+    './indexability': executeModule(resolve('app/community/indexability.ts'), () => ({ inferCommunityBoardFromLegacyHub: () => null }), environment),
     './anonymousColumn': {
       isMissingAnonymousColumnError: () => false,
       isMissingCommunityBoardColumnError: () => false,
