@@ -1,0 +1,37 @@
+name: SEO Sitemap Recovery
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      LOCALLY_ISR_BRIDGE_SOURCE: fixture
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54329
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_cloudflare_foundation_fixture
+      SUPABASE_SERVICE_ROLE_KEY: sb_secret_cloudflare_foundation_fixture
+      NEXT_TELEMETRY_DISABLED: '1'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci
+      - name: Local PostgreSQL (PGlite) and real SDK sitemap regressions
+        run: npm run test:seo:sitemap
+      - name: Lint sitemap change
+        run: npx eslint app/sitemap.ts app/utils/sitemapData.ts tests/integration/sitemap-recovery.test.mjs
+      - name: Build OpenNext without provider access
+        run: npm run cloudflare:build:production
+      - name: Verify the real sitemap in local workerd with synthetic SQL and R2 only
+        run: SITEMAP_RUNTIME=opennext npm run test:seo:sitemap
+      - run: git diff --check
