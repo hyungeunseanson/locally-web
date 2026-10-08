@@ -25,6 +25,11 @@ const source = JSON.parse(
 );
 assert.equal(source.binaryRevision, profile.browserRevision.slice(1));
 assert.equal(source.ancestry.mergeBase, profile.fixCommit);
+assert.equal(
+  source.sourceOrderComparison.patched.revision,
+  profile.browserRevision.slice(1),
+);
+assert.equal(source.sourceOrderComparison.patched.url, profile.exactSource);
 assert.equal(source.sourceOrderComparison.patched.preClientHandleResult, true);
 const env = Object.fromEntries(
   ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL"]

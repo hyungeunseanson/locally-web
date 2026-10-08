@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/cloudflare/chromium8508456*'
+      - 'scripts/cloudflare/chromium8508456-fixture/**'
       - 'scripts/cloudflare/download-chromium8508456-ci.mjs'
       - 'scripts/cloudflare/run-chromium8508456-ci.mjs'
       - 'scripts/cloudflare/verify-pinned-release-browser*'
@@ -20,6 +21,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24.20.0
