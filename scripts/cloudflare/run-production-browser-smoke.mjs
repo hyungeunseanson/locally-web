@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
+import { createHash } from 'node:crypto';
 
 import { chromium, errors } from '@playwright/test';
 import { versionOverrideHeader } from './candidate-release-contract.mjs';
+import { createCandidateReadTransport } from './candidate-read-transport.mjs';
 
 const DEFAULT_PRODUCTION_ORIGIN = 'https://www.locally-travel.com';
 const GENERIC_ERROR_TEXT = /페이지를 불러오지 못했습니다|Something went wrong|An error occurred/i;
@@ -66,10 +68,27 @@ export async function installProductionMutationGate(context, origin, {
   const blockedUnexpectedExternalWrites = [];
   const stubbedExternalScripts = [];
   const anonymousReadHeaders = { cookieHeadersStripped: 0, authorizationHeadersStripped: 0 };
+  const transport = override && fetchImplementation === fetch ? createCandidateReadTransport(productionOrigin) : null;
+  const readFetch = transport?.fetch ?? fetchImplementation;
   const pendingCandidateReads = new Map();
+  let transportSequence = 0;
+  const transportEvent = (state, phase, details = {}) => {
+    if (!phase.startsWith('teardown-') && phase !== 'body-chunk') state.phase = phase;
+    versionOverride?.onTransport?.({ requestId: state.requestId, pathname: state.pathname,
+      method: state.method, resourceType: state.resourceType, phase, teardown: state.teardown,
+      timestampMs: performance.now(), versionId: versionOverride?.versionId,
+      remoteStatus: state.remoteStatus ?? null, headersReceived: state.headersReceived ?? false,
+      bodyBytesReceived: state.bodyBytesReceived ?? null, bodyComplete: state.bodyComplete ?? false,
+      fulfillStarted: state.fulfillStarted ?? false, fulfillCompleted: state.fulfillCompleted ?? false,
+      routeAbortCalled: state.routeAbortCalled ?? false, abortReasonCategory: state.abortReasonCategory ?? null,
+      signalAborted: state.signal?.aborted ?? false, signalReasonName: state.signal?.reason?.name ?? null, ...details }, state.request);
+  };
   const abortPendingReads = async page => {
     await Promise.all([...pendingCandidateReads].filter(([, state]) => !page || state.page === page).map(async ([route, state]) => {
       state.teardown = true;
+      state.routeAbortCalled = true;
+      state.abortReasonCategory = 'explicit-teardown';
+      transportEvent(state, 'teardown-abort');
       state.controller.abort();
       await route.abort('aborted').catch(() => {});
     }));
@@ -83,7 +102,10 @@ export async function installProductionMutationGate(context, origin, {
     });
     if (typeof context.close === 'function') {
       const close = context.close.bind(context);
-      context.close = async (...args) => { await abortPendingReads(); return close(...args); };
+      context.close = async (...args) => {
+        await abortPendingReads();
+        try { return await close(...args); } finally { await transport?.close(); }
+      };
     }
   }
 
@@ -116,10 +138,14 @@ export async function installProductionMutationGate(context, origin, {
 
     if (READ_METHODS.has(method)) {
       if (override && url.origin === productionOrigin) {
-        const state = { controller: new AbortController(), page: request.frame?.().page(), teardown: false };
+        const state = { controller: new AbortController(), page: request.frame?.().page(), teardown: false,
+          requestId: `forward-${++transportSequence}`, pathname: url.pathname, method, resourceType: request.resourceType(), request };
+        transportEvent(state, 'route-enter');
         pendingCandidateReads.set(route, state);
         try {
+          transportEvent(state, 'headers-start');
           const headers = { ...await request.allHeaders() };
+          transportEvent(state, 'headers-complete', { conditionals: Object.fromEntries(['if-none-match', 'if-modified-since'].map(name => [name, headers[name] ? createHash('sha256').update(headers[name]).digest('hex') : null])) });
           if (state.teardown) return;
           if (Object.hasOwn(headers, 'cookie')) anonymousReadHeaders.cookieHeadersStripped += 1;
           if (Object.hasOwn(headers, 'authorization')) anonymousReadHeaders.authorizationHeadersStripped += 1;
@@ -131,19 +157,71 @@ export async function installProductionMutationGate(context, origin, {
           if (url.pathname === '/.well-known/locally-release' && ['GET', 'HEAD'].includes(method)) headers['X-Locally-Release-Probe'] = '1';
           // The optional second argument is in-memory correlation only. The
           // serializable receipt contains no header or cookie values.
+          transportEvent(state, 'override-applied', { versionId: versionOverride.versionId, cookie: false, authorization: false });
           versionOverride.onApplied?.({ pathname: url.pathname, resourceType: request.resourceType(), method, anonymous: true, forwarding: 'stateless-read' }, request);
           // Chromium restores cookies and releases paused reads on teardown.
           // Forward candidate reads statelessly: no cookie jar, credentials,
           // redirect following or retry; preserve HTTP and transport errors.
-          const response = await fetchImplementation(request.url(), { method, headers, redirect: 'manual', signal: AbortSignal.any([AbortSignal.timeout(NAVIGATION_TIMEOUT_MS), state.controller.signal]) });
+          state.signal = AbortSignal.any([AbortSignal.timeout(NAVIGATION_TIMEOUT_MS), state.controller.signal]);
+          transportEvent(state, 'fetch-start');
+          const response = await readFetch(request.url(), { method, headers, redirect: 'manual', signal: state.signal });
+          state.remoteStatus = response.status;
+          state.headersReceived = true;
+          transportEvent(state, 'fetch-headers', { status: response.status });
+          transportEvent(state, 'body-start');
+          let body;
+          if (typeof response.body?.getReader === 'function') {
+            const reader = response.body.getReader(), chunks = []; state.bodyBytesReceived = 0;
+            try {
+              for (;;) {
+                const { done, value } = await reader.read(); if (done) break;
+                const bytes = Buffer.from(value); chunks.push(bytes); state.bodyBytesReceived += bytes.length;
+                transportEvent(state, 'body-chunk', { chunkBytes: bytes.length });
+              }
+              body = Buffer.concat(chunks);
+            } finally { reader.releaseLock(); }
+          } else body = Buffer.from(await response.arrayBuffer());
+          state.bodyBytesReceived = body.length;
+          state.bodyComplete = true;
+          transportEvent(state, 'body-complete', { bytes: body.length, sha256: createHash('sha256').update(body).digest('hex') });
+          // Private correlation observes the actual forwarded conditionals and
+          // empty network 304 body. It does not alter request/cache semantics.
+          transportEvent(state, 'observer-start');
+          if (versionOverride.onReadResponse) await versionOverride.onReadResponse({
+            url: request.url(), method, resourceType: request.resourceType(), status: response.status,
+            requestHeaders: headers, responseHeaders: Object.fromEntries(response.headers),
+            networkBytes: body.length, networkSHA256: createHash('sha256').update(body).digest('hex'),
+          }, request);
+          transportEvent(state, 'observer-complete');
           const responseHeaders = Object.fromEntries(response.headers);
           // Fetch decodes compression; let fulfill set the decoded body length.
           delete responseHeaders['content-encoding'];
           delete responseHeaders['content-length'];
           const cookies = response.headers.getSetCookie();
           if (cookies.length) responseHeaders['set-cookie'] = cookies.join('\n');
-          await route.fulfill({ status: response.status, headers: responseHeaders, body: Buffer.from(await response.arrayBuffer()) });
-        } catch { if (!state.teardown) await route.abort('failed').catch(() => {}); }
+          state.fulfillStarted = true;
+          transportEvent(state, 'fulfill-start', { status: response.status });
+          await route.fulfill({ status: response.status, headers: responseHeaders, body });
+          state.fulfillCompleted = true;
+          transportEvent(state, 'fulfill-complete');
+        } catch (error) {
+          const failedPhase = state.phase;
+          // Never serialize arbitrary exception text: it can contain headers,
+          // signed URLs or data. Retain a technical category and digest instead.
+          const message = String(error?.message ?? '');
+          const known = ['fetch failed', 'terminated', 'Target closed', 'Target page, context or browser has been closed', 'Invalid InterceptionId', 'Response body is unavailable for redirect responses'];
+          transportEvent(state, 'catch', { failedPhase,
+            errorName: /^[A-Za-z]+Error$/.test(error?.name ?? '') ? error.name : 'Error',
+            errorCode: /^[A-Z][A-Z0-9_]{0,63}$/.test(error?.cause?.code ?? error?.code ?? '') ? (error?.cause?.code ?? error.code) : null,
+            message: known.find(text => message.includes(text)) ?? '[unrecognized exception text redacted]',
+            messageSHA256: createHash('sha256').update(message).digest('hex') });
+          if (!state.teardown) {
+            state.routeAbortCalled = true;
+            state.abortReasonCategory = 'forwarder-exception';
+            transportEvent(state, 'abort-failed-start');
+            await route.abort('failed').then(() => transportEvent(state, 'abort-failed-complete'), () => transportEvent(state, 'abort-failed-error'));
+          }
+        }
         finally { pendingCandidateReads.delete(route); }
       } else {
         if (override && url.origin !== productionOrigin) {

@@ -263,7 +263,7 @@ test('Stable and candidate Home / 4659 hydration, anonymous cookie/auth strippin
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
     received.push({ pathname, method: request.method, cookiePresent: Object.hasOwn(request.headers,'cookie'), authorizationPresent:Object.hasOwn(request.headers,'authorization'), override: request.headers['cloudflare-workers-version-overrides'], probe: request.headers['x-locally-release-probe'] });
     if (pathname === '/.well-known/locally-release') { response.writeHead(204, { 'X-Locally-Worker-Version': candidateId }).end(); return; }
-    if (pathname === '/api/proxy-bookings') { response.writeHead(401).end(); return; }
+    if (pathname === '/api/proxy-bookings') { response.writeHead(401, {'content-type':'application/json'}).end('{"error":"Unauthorized synthetic fixture"}'); return; }
     if (pathname === '/data' || pathname === '/authorized-read') { response.writeHead(200, { 'content-type': 'application/json' }).end('{}'); return; }
     if (files.has(pathname)) {
       if(pathname.endsWith('app.js')){response.writeHead(200,{'content-type':'text/javascript','content-encoding':'gzip'}).end(gzipSync(files.get(pathname)));return;}
@@ -307,7 +307,7 @@ test('Stable and candidate Home / 4659 hydration, anonymous cookie/auth strippin
 
 test('ordinary stable Home and 4659 use the same client interactions without an Experience globe handler or writes', async () => {
   const server = createServer((request,response) => {
-    if(request.url==='/api/proxy-bookings'){response.writeHead(401).end();return;}
+    if(request.url==='/api/proxy-bookings'){response.writeHead(401, {'content-type':'application/json'}).end('{"error":"Unauthorized synthetic fixture"}');return;}
     response.writeHead(200,{'content-type':'text/html'}).end(`<!doctype html><title>Fixture</title><body><h1>Fixture</h1><a href="/experiences/4659">Experience</a>
       ${request.url==='/'?'<button id="globe"><svg class="lucide-globe" width="18" height="18"></svg></button><script>document.querySelector("#globe").onclick=()=>{const m=document.querySelector("#menu");if(m)m.remove();else{const m=document.createElement("button");m.id="menu";m.textContent="English";document.body.append(m);}};</script>':''}
       ${request.url==='/experiences/4659'?'<p data-testid="experience-summary-description-desktop">Fixture description</p><button data-testid="experience-summary-read-more-desktop">Read more</button><script>document.querySelector("[data-testid=experience-summary-read-more-desktop]").onclick=event=>event.target.remove();</script>':''}
@@ -542,7 +542,7 @@ async function captureOrderingFixture(options = {}) {
     const latch = late || never ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
     const request = { url: () => PRODUCTION_ORIGIN + pathname + '?private=NEVER_LOG', method: () => 'GET', resourceType: () => type,
       frame: () => ({ page: () => page }), redirectedFrom: () => redirected ? {} : null,
-      failure:()=>({errorText:options.teardownFailure?'net::ERR_ABORTED':'net::ERR_FAILED'}),
+      failure:()=>({errorText:(options.teardownFailure||options.liveAbort)?'net::ERR_ABORTED':'net::ERR_FAILED'}),
       headerValue: async name => { await latch; return name === 'cloudflare-workers-version-overrides' ? missingOverride ? null : override : name === 'x-locally-release-probe' && pathname === '/.well-known/locally-release' ? '1' : null; } };
     context.emit('request', request);applyOverride?.({pathname,resourceType:type,method:'GET'});
     if(options.requestFailure&&pathname.endsWith('app.js')){context.emit('requestfailed',request);return;}
@@ -585,7 +585,7 @@ async function captureOrderingFixture(options = {}) {
       for (const pathname of ['/', '/experiences/42', '/login']) {
         const page = await context.newPage(); page.pathname=pathname;page.refs = ['/_next/static/app.js', '/_next/static/font.woff2', '/_next/static/style.css'];
         respond(page, pathname, { type: 'document', missingOverride: options.workerMissingOverride, status:options.workerRedirect?302:200 });
-        respond(page, '/data', { type: 'fetch' }); respond(page, '/image.svg', { type: 'image' });
+        respond(page, '/data', { type: 'fetch', status: options.data304 ? 304 : 200 }); respond(page, '/image.svg', { type: 'image' });
         const otherPage = await context.newPage();
         const specs = page.refs.map((p, index) => [p, { type: ['script', 'font', 'stylesheet'][index], late: Boolean(options.late),
           ...(index === 0 ? options.asset : {}), ...(index === 2 ? options.stylesheet : {}), ...(index === 0 && options.otherPage ? { otherPage } : {}) }]);
@@ -620,7 +620,7 @@ test('pending browser requests are diagnostic; DOM-only and other-page resources
     const {result,probes}=await captureOrderingFixture(options);assert(result.assetSetMatches);assert(probes.includes('/_next/static/app.js'));
   }
 });
-for(const asset of [{status:404},{status:503},{status:302},{redirected:true}])test(`browser asset safety ${JSON.stringify(asset)} remains hard`,async()=>{
+for(const asset of [{status:404},{status:503},{status:302},{status:307},{status:304},{redirected:true}])test(`browser asset safety ${JSON.stringify(asset)} remains hard`,async()=>{
   await assert.rejects(captureOrderingFixture({asset}),blocked('candidate_http_or_asset_failure'));
 });
 test('requestfailed during live page execution remains hard even with valid direct bytes',async()=>{
@@ -695,4 +695,53 @@ test('staged build proof omitting or replacing zero entry blocks upload despite 
   await assert.rejects(executeCandidateReleaseContract(plan,actions),blocked('bridge_provenance_or_freshness_failed'));
   assert(!calls.includes('upload'));
  }
+});
+
+test('live ERR_ABORTED and unexpected RSC/API 304 remain hard failures',async()=>{
+  await assert.rejects(captureOrderingFixture({requestFailure:true,liveAbort:true}),blocked('candidate_request_failure'));
+  await assert.rejects(captureOrderingFixture({data304:true}),blocked('candidate_http_or_asset_failure'));
+});
+
+test('promotion contract requires independent cached representation, executed JS and unchanged direct GET proof',()=>{
+  const make = () => {
+    const smoke=makeSmoke(), pathname=smoke.assetRefs[0], sha256='a'.repeat(64);
+    smoke.assetResponses[0]={...smoke.assetResponses[0],hashMatch:true,sha256};
+    smoke.browserAssetResponses=[{pathname,status:304,bodyComplete:false,redirected:false,overrideApplied:true}];
+    const executionProof={ownerId:'owner',targetId:'target',generation:0,snapshotId:1,scriptId:'script',executionContextId:1,sha256,executed:true};
+    smoke.coverageOwners=[{ownerId:'owner',targetId:'target',snapshotId:2,finalized:true,cleanupComplete:true,
+      audit:['Profiler.startPreciseCoverage','Profiler.stopPreciseCoverage','Profiler.disable'].map(method=>({method})),
+      scripts:[{scriptId:'script',executionContextId:1,generation:0,sha256,ranges:[{count:1}]}]}];
+    smoke.cacheValidationReceipts=[{pathname,status:304,networkBodyBytes:0,sha256,validatedCachedRepresentation:true,browserFinished:true,scriptExecuted:true,executionProof}];
+    return smoke;
+  };
+  assertFullCandidateSmoke(make());
+  for(const mutate of [s=>{s.cacheValidationReceipts=[];},s=>{s.cacheValidationReceipts[0].scriptExecuted=false;},s=>{s.cacheValidationReceipts[0].networkBodyBytes=1;},s=>{s.cacheValidationReceipts[0].browserFinished=false;},s=>{s.browserAssetResponses[0].bodyComplete=true;},s=>{s.assetResponses[0].sha256='b'.repeat(64);},s=>{s.cacheValidationReceipts[0].executionProof=null;},s=>{s.coverageOwners=[];},s=>{s.cacheValidationReceipts[0].executionProof.targetId='other';},s=>{s.coverageOwners[0].scripts[0].ranges[0].count=0;}]){
+    const smoke=make();mutate(smoke);assert.throws(()=>assertFullCandidateSmoke(smoke),blocked('candidate_cache_revalidation_failed'));
+  }
+});
+
+test('coverage owner lifecycle omissions and duplicate starts remain hard failures',()=>{
+  for(const mutation of ['start-duplicate','missing-final','missing-cleanup']) {
+    const smoke=makeSmoke();const owner={snapshotId:1,finalized:true,cleanupComplete:true,audit:['Profiler.startPreciseCoverage','Profiler.stopPreciseCoverage','Profiler.disable'].map(method=>({method}))};
+    if(mutation==='start-duplicate')owner.audit.push({method:'Profiler.startPreciseCoverage'});
+    if(mutation==='missing-final')owner.finalized=false;
+    if(mutation==='missing-cleanup')owner.cleanupComplete=false;
+    smoke.coverageOwners=[owner];assert.throws(()=>assertFullCandidateSmoke(smoke),blocked('candidate_coverage_owner_violation'));
+  }
+});
+
+test('late informational notice between locale menu clicks is dismissed through UI without losing open/close proof', {timeout:20000}, async()=>{
+  const {chromium}=await import('@playwright/test');
+  const server=createServer((_req,res)=>res.writeHead(200,{'content-type':'text/html'}).end(`<body><div id="locally-app-shell"><button id="globe"><svg class="lucide-globe" width="16" height="16"></svg></button><div id="menu" hidden><button>English</button></div></div><script>
+    window.toggles=0;window.dismissals=0;
+    document.querySelector('#globe').onclick=()=>{const m=document.querySelector('#menu');m.hidden=!m.hidden;window.toggles++;if(window.toggles===1)setTimeout(()=>{
+      document.querySelector('#locally-app-shell').setAttribute('inert','');
+      const overlay=document.createElement('div');overlay.dataset.testid='legacy-experience-popup-overlay';overlay.style='position:fixed;inset:0;background:white;z-index:999';overlay.innerHTML='<button data-testid="legacy-experience-popup-close">Close</button>';document.body.append(overlay);
+      overlay.querySelector('button').onclick=()=>{overlay.remove();document.querySelector('#locally-app-shell').removeAttribute('inert');window.dismissals++};
+    },20)};
+    document.addEventListener('mousedown',e=>{if(!document.querySelector('#locally-app-shell').contains(e.target))document.querySelector('#menu').hidden=true});
+  </script>`));
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
+  const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})});
+  try{const page=await browser.newPage();await page.goto(origin);const result=await verifyReadOnlyClientInteraction(page);assert.equal(result.opened,true);assert.equal(result.closed,true);assert.equal(result.noticeDismissed,true);assert.equal(await page.evaluate(()=>window.dismissals),1);assert.equal(await page.getByRole('button',{name:'English',exact:true}).isVisible(),false);assert.equal(await page.evaluate(()=>document.querySelector('#locally-app-shell').hasAttribute('inert')),false);}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });

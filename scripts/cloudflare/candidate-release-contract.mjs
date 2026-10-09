@@ -259,6 +259,28 @@ export function assertFullCandidateSmoke(smoke) {
     && smoke.assetRefs.every(path => path.startsWith('/_next/static/') && !path.includes('?')
       && smoke.assetResponses?.some(r => r.pathname === path && r.status === 200 && r.overrideApplied === true && r.redirected === false)), 'candidate_asset_missing');
   requireCondition(smoke.assetSetMatches === true, 'candidate_asset_set_mismatch');
+  for (const owner of smoke.coverageOwners ?? []) {
+    requireCondition(owner.finalized === true && owner.cleanupComplete === true && owner.snapshotId > 0
+      && ['Profiler.startPreciseCoverage', 'Profiler.stopPreciseCoverage', 'Profiler.disable'].every(method =>
+        owner.audit.filter(row => row.method === method).length === 1), 'candidate_coverage_owner_violation');
+  }
+  for (const row of smoke.browserAssetResponses ?? []) {
+    if (row.status !== 304) continue;
+    requireCondition(row.bodyComplete === false && row.redirected === false && row.overrideApplied === true
+      && smoke.cacheValidationReceipts?.some(receipt => receipt.pathname === row.pathname && receipt.status === 304
+        && receipt.networkBodyBytes === 0 && receipt.validatedCachedRepresentation === true
+        && receipt.browserFinished === true && receipt.scriptExecuted === true
+        && receipt.executionProof?.executed === true && receipt.executionProof.sha256 === receipt.sha256
+        && smoke.coverageOwners?.some(owner => owner.ownerId === receipt.executionProof.ownerId
+          && owner.targetId === receipt.executionProof.targetId && receipt.executionProof.snapshotId > 0
+          && receipt.executionProof.snapshotId <= owner.snapshotId
+          && owner.scripts.some(script => script.scriptId === receipt.executionProof.scriptId
+            && script.executionContextId === receipt.executionProof.executionContextId
+            && script.generation === receipt.executionProof.generation && script.sha256 === receipt.sha256
+            && script.ranges.some(range => range.count > 0)))
+        && smoke.assetResponses.some(asset => asset.pathname === receipt.pathname && asset.status === 200
+          && asset.hashMatch === true && asset.sha256 === receipt.sha256)), 'candidate_cache_revalidation_failed');
+  }
   requireCondition(Array.isArray(smoke.attempts) && smoke.attempts.length > 0, 'bounded_attempt_evidence_missing');
   const byPath = new Map();
   for (const attempt of smoke.attempts) {
