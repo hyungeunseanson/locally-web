@@ -35,9 +35,12 @@ export function createCandidateReadTransport(origin, {
       callback(null, options?.all ? row.records : row.records[0].address, 4);
     }).catch(error => { receipts.push({ hostname: host, status: 'failed', code: error.code ?? 'DNS_ERROR' }); callback(error); });
   };
-  // Close after each read: an idle peer-close race must not silently replay a
-  // candidate request. Fresh sockets retain hostname/TLS verification.
-  const dispatcher = makeDispatcher({ connections: 8, pipelining: 0, connect: { lookup } });
+  // Negotiate the origin's HTTP/2 support rather than forcing browser traffic
+  // through fresh HTTP/1.1 connections. Bound H2 streams to the existing read
+  // concurrency. H1 still disables idle reuse; neither protocol replays errors.
+  // TLS/hostname verification and each caller's original deadline stay intact.
+  const dispatcher = makeDispatcher({ connections: 8, pipelining: 0, allowH2: true,
+    maxConcurrentStreams: 8, connect: { lookup } });
   return {
     fetch: (url, options = {}) => {
       if (closed) throw new Error('Candidate transport closed');
@@ -46,7 +49,10 @@ export function createCandidateReadTransport(origin, {
       }
       return fetchImplementation(url, { ...options, dispatcher });
     },
-    close: async () => { closed = true; await dispatcher.close(); },
+    // Scope teardown must also dispose reset H2 sessions. Graceful close can wait
+    // forever for a peer that kept a failed stream's session open. This is only
+    // explicit cleanup; active request failures remain rejected and unreplayed.
+    close: async () => { closed = true; await dispatcher.destroy(); },
     receipts: () => structuredClone(receipts),
   };
 }
