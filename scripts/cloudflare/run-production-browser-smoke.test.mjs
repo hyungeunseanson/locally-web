@@ -15,6 +15,7 @@ import {
 } from './run-production-browser-smoke.mjs';
 
 const runProductionBrowserSmoke = (origin, options) => productionBrowserSmoke(origin, { log: () => {}, ...options });
+const launchFixtureBrowser = () => chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 
 test('candidate page/context teardown aborts paused reads before original headers can escape, including pending header capture', async () => {
   for (const closing of ['page', 'context']) for (const stage of ['headers', 'body']) {
@@ -121,7 +122,7 @@ test('local A/B: unchanged global mutation routing disables warm HTTP asset cach
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch();
+  const browser = await launchFixtureBrowser();
   const measurements = [];
   try {
     for (const routed of [false, true]) {
@@ -212,7 +213,7 @@ async function withFixtureServer({
       return;
     }
     if (url.pathname === '/api/proxy-bookings') {
-      response.writeHead(apiStatus).end();
+      response.writeHead(apiStatus, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Unauthorized synthetic fixture' }));
       return;
     }
 
@@ -779,7 +780,7 @@ test('intentional teardown excludes only new page/console errors and retains pre
 });
 
 test('real browser: pending reads aborted at close pass; identical fetch errors and HTTP/network failures before close fail', async () => {
-  const browser = await chromium.launch();
+  const browser = await launchFixtureBrowser();
   try {
     for (const mode of ['pending', 'http', 'network']) {
       let resolveReview;
@@ -980,7 +981,7 @@ test('unauthenticated API status mismatch fails immediately without a retry', as
 for (const pathname of ['/', '/experiences/42']) {
   test(`real ${pathname} navigation timeout then fresh Page success retains mutation blocking`, async () => {
     await withFixtureServer({ navigationTimeoutPath: pathname, navigationTimeoutAttempts: 1 }, async ({ origin, receivedRequests }) => {
-      const browser = await chromium.launch({ headless: true });
+      const browser = await launchFixtureBrowser();
       const context = await browser.newContext({ serviceWorkers: 'block' });
       const mutationGate = await installProductionMutationGate(context, origin);
       const diagnostics = [];
@@ -1006,7 +1007,7 @@ for (const pathname of ['/', '/experiences/42']) {
 
 test('real navigation timeout twice fails without a third Page/request', async () => {
   await withFixtureServer({ navigationTimeoutPath: '/', navigationTimeoutAttempts: 2 }, async ({ origin, receivedRequests }) => {
-    const browser = await chromium.launch({ headless: true });
+    const browser = await launchFixtureBrowser();
     const context = await browser.newContext({ serviceWorkers: 'block' });
     const mutationGate = await installProductionMutationGate(context, origin);
     const diagnostics = [];
@@ -1022,4 +1023,78 @@ test('real navigation timeout twice fails without a third Page/request', async (
       await browser.close();
     }
   });
+});
+
+
+test('forwarder diagnostic receipts distinguish fetch, body, observer and fulfill exceptions without disclosing values', async () => {
+  const outcomes = { fetch: 'fetch-start', body: 'body-start', observer: 'observer-start', fulfill: 'fulfill-start' };
+  for (const [outcome, failedPhase] of Object.entries(outcomes)) {
+    let handler, fetches = 0;
+    const events = [], actions = [];
+    const failure = new TypeError('PRIVATE_COOKIE_SENTINEL https://private.invalid/?token=PRIVATE_TOKEN_SENTINEL');
+    failure.cause = { code: 'UND_ERR_SOCKET' };
+    await installProductionMutationGate({ route: async (_, callback) => { handler = callback; } }, 'https://www.locally-travel.com', {
+      versionOverride: { workerName: 'locally-web-opennext-production', versionId: '22222222-2222-4222-8222-222222222222',
+        onTransport: receipt => events.push(receipt), onReadResponse: async () => { if (outcome === 'observer') throw failure; } },
+      fetchImplementation: async (_url, options) => {
+        fetches++; assert(!options.headers.cookie); assert(!options.headers.authorization);
+        if (outcome === 'fetch') throw failure;
+        if (outcome === 'body') return { status: 200, headers: new Headers(), arrayBuffer: async () => { throw failure; } };
+        return new Response('fixture');
+      },
+    });
+    await handler({request:()=>({url:()=> 'https://www.locally-travel.com/_next/static/chunks/fixture.js',method:()=> 'GET',resourceType:()=> 'script',allHeaders:async()=>({cookie:'PRIVATE_COOKIE_SENTINEL',authorization:'PRIVATE_TOKEN_SENTINEL','if-none-match':'"PRIVATE_VALIDATOR_SENTINEL"'})}),
+      fulfill:async()=>{ if(outcome==='fulfill')throw failure; actions.push('fulfill'); },abort:async reason=>actions.push(reason)});
+    const caught = events.find(r => r.phase === 'catch');
+    assert.equal(caught.failedPhase, failedPhase); assert.equal(caught.errorName, 'TypeError'); assert.equal(caught.errorCode, 'UND_ERR_SOCKET');
+    assert.equal(caught.message, '[unrecognized exception text redacted]'); assert.equal(caught.messageSHA256.length,64);
+    assert(events.every(r=>r.requestId===caught.requestId)); assert.equal(fetches,1); assert.deepEqual(actions,['failed']);
+    assert(events.some(r=>r.phase==='abort-failed-complete')); assert(!events.some(r=>r.phase==='fulfill-complete'));
+    assert(!JSON.stringify(events).includes('SENTINEL')); assert(!JSON.stringify(events).includes('private.invalid'));
+  }
+});
+
+test('forwarder diagnostics preserve HTTP status including 304, redirects and errors without retry or forced success', async () => {
+  for (const status of [200,304,302,307,403,404,503]) {
+    let handler, fetches=0;
+    const events=[], fulfilled=[];
+    await installProductionMutationGate({route:async(_,callback)=>{handler=callback;}},'https://www.locally-travel.com',{
+      versionOverride:{workerName:'locally-web-opennext-production',versionId:'22222222-2222-4222-8222-222222222222',onTransport:r=>events.push(r)},
+      fetchImplementation:async()=>{fetches++;return new Response(status===304?null:'fixture',{status});},
+    });
+    await handler({request:()=>({url:()=> 'https://www.locally-travel.com/_next/static/chunks/fixture.js',method:()=> 'GET',resourceType:()=> 'script',allHeaders:async()=>({})}),fulfill:async r=>fulfilled.push(r),abort:async()=>assert.fail('unexpected abort')});
+    assert.equal(fetches,1); assert.equal(fulfilled[0].status,status); assert.equal(events.find(r=>r.phase==='fetch-headers').status,status);
+    assert.equal(events.at(-1).phase,'fulfill-complete'); assert(!events.some(r=>r.phase==='catch'));
+    if(status===304)assert.equal(events.find(r=>r.phase==='body-complete').bytes,0);
+  }
+});
+
+test('real truncated JS transfer fails in body stage and produces browser ERR_FAILED without fulfill or retry', async () => {
+  const stages=[], failures=[], cdpFailures=[];
+  let assetCalls=0;
+  const server=createServer((req,res)=>{
+    if(req.url==='/_next/static/chunks/truncated.js'){
+      assetCalls++;res.writeHead(200,{'content-type':'application/javascript','content-length':'10000'});res.write('window.partialMustNeverExecute=true;');
+      setTimeout(()=>res.destroy(),30);
+    }else res.writeHead(200,{'content-type':'text/html'}).end('<html><body><script src="/_next/static/chunks/truncated.js"></script></body></html>');
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const origin=`http://127.0.0.1:${server.address().port}`;
+  const browser=await launchFixtureBrowser();
+  const context=await browser.newContext({serviceWorkers:'block'});
+  try{
+    await installProductionMutationGate(context,origin,{versionOverride:{workerName:'locally-web-opennext-production',versionId:'22222222-2222-4222-8222-222222222222',onTransport:r=>stages.push(r)}});
+    const page=await context.newPage(),cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
+    cdp.on('Network.loadingFailed',r=>cdpFailures.push({errorText:r.errorText,canceled:r.canceled}));
+    page.on('requestfailed',q=>failures.push(q.failure()?.errorText));
+    await page.goto(origin,{waitUntil:'load',timeout:15000});
+    const caught=stages.find(r=>r.pathname.endsWith('/truncated.js')&&r.phase==='catch');
+    assert.equal(caught.failedPhase,'body-start');assert.equal(caught.remoteStatus,200);assert.equal(caught.headersReceived,true);
+    assert.equal(caught.bodyBytesReceived,Buffer.byteLength('window.partialMustNeverExecute=true;'));
+    assert.equal(caught.bodyComplete,false);assert.equal(caught.fulfillStarted,false);assert.equal(caught.teardown,false);
+    assert(['UND_ERR_SOCKET','UND_ERR_RES_CONTENT_LENGTH_MISMATCH'].includes(caught.errorCode));assert.equal(assetCalls,1);
+    assert(stages.some(r=>r.pathname.endsWith('/truncated.js')&&r.phase==='abort-failed-complete'&&r.routeAbortCalled));
+    assert(failures.includes('net::ERR_FAILED'));assert(cdpFailures.some(r=>r.errorText==='net::ERR_FAILED'&&!r.canceled));
+    assert.equal(await page.evaluate(()=>window.partialMustNeverExecute),undefined);
+  }finally{await context.close();await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });

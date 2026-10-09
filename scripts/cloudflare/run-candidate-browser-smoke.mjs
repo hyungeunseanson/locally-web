@@ -2,16 +2,20 @@ import { runProductionBrowserSmoke } from './run-production-browser-smoke.mjs';
 import { assertFullCandidateSmoke, assertOverrideIdentity, CandidateReleaseBlocked, versionOverrideHeader } from './candidate-release-contract.mjs';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { createCacheRevalidationObserver } from './candidate-cache-revalidation.mjs';
+import { prepareCoverageContext } from './candidate-coverage-owner.mjs';
 
 // Execute existing client state handlers without saving Production data.
 export async function verifyReadOnlyClientInteraction(page) {
   const deadline = Date.now() + 15000;
   const timeout = () => Math.max(1, deadline - Date.now());
+  let stage = 'route', removeNoticeHandler;
   try {
     const pathname = new URL(page.url()).pathname;
     if (/^\/experiences\/\d+$/.test(pathname)) {
       const button = page.getByTestId('experience-summary-read-more-desktop');
       const description = page.getByTestId('experience-summary-description-desktop');
+      stage = 'experience-button';
       await button.waitFor({ state: 'visible', timeout: timeout() });
       await description.waitFor({ state: 'visible', timeout: timeout() });
       await page.waitForFunction(() => {
@@ -26,24 +30,44 @@ export async function verifyReadOnlyClientInteraction(page) {
     }
     // The existing Home notice makes the app shell inert. Use its real close
     // control first; dismissal is confined to this disposable browser context.
+    stage = 'notice';
     const notice = page.getByTestId('legacy-experience-popup-close');
-    const noticeDismissed = await notice.isVisible();
+    let noticeDismissed = await notice.isVisible();
     if (noticeDismissed) {
       await notice.click({ timeout: timeout() });
       await page.getByTestId('legacy-experience-popup-overlay').waitFor({ state: 'hidden', timeout: timeout() });
     }
+    stage = 'home-handler';
     await page.waitForFunction(() => Array.from(document.querySelectorAll('button')).some(button =>
       button.querySelector('svg.lucide-globe') && button.getBoundingClientRect().width > 0
       && (typeof button.onclick === 'function' || Object.keys(button).some(key =>
         key.startsWith('__reactProps$') && typeof button[key]?.onClick === 'function'))), {}, { timeout: timeout() });
     const globe = page.locator('button:visible').filter({ has: page.locator('svg.lucide-globe') }).first();
     const menuItem = page.getByRole('button', { name: 'English', exact: true });
+    if (typeof page.addLocatorHandler === 'function') {
+      // The actual notice mounts 500ms after hydration and can appear between
+      // the two menu clicks. Dismiss only this reviewed informational overlay
+      // through its real control; preserve the menu state for the next click.
+      await page.addLocatorHandler(notice, async () => {
+        const wasOpen = await menuItem.isVisible();
+        await notice.click({ timeout: timeout() });
+        await page.getByTestId('legacy-experience-popup-overlay').waitFor({ state: 'hidden', timeout: timeout() });
+        noticeDismissed = true;
+        if (wasOpen && !await menuItem.isVisible()) {
+          await globe.click({ timeout: timeout() });
+          await menuItem.waitFor({ state: 'visible', timeout: timeout() });
+        }
+      });
+      removeNoticeHandler = () => page.removeLocatorHandler(notice);
+    }
+    stage = 'locale-open';
     await globe.click({ timeout: timeout() });
     await menuItem.waitFor({ state: 'visible', timeout: timeout() });
+    stage = 'locale-close';
     await globe.click({ timeout: timeout() });
     await menuItem.waitFor({ state: 'hidden', timeout: timeout() });
     return { pathname, interaction: 'locale-menu-open-close', opened: true, closed: true, noticeDismissed };
-  } catch { throw new CandidateReleaseBlocked('candidate_client_interaction_failed'); }
+  } catch (cause) { const error = new CandidateReleaseBlocked('candidate_client_interaction_failed'); error.interactionFailure = { stage, name: cause.name, messageSHA256: createHash('sha256').update(cause.message ?? '').digest('hex') }; throw error; } finally { await removeNoticeHandler?.(); }
 }
 
 // PR #158 owns retry/navigation/readiness policy. The 1s diagnostic drain below
@@ -57,9 +81,10 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
 } = {}) {
   if (mode !== 'override') throw new CandidateReleaseBlocked('invalid_candidate_smoke_mode');
   const override = versionOverrideHeader(workerName, versionId);
+  const cache = createCacheRevalidationObserver({ origin, override, readAsset });
   const assetRefs = new Set(), hints = new Set(), browserAssetResponses = [], workerReceipts = [], assetEvidence = [], clientInteractions = [];
   const pending = new Set(), pageRequests = new WeakMap(), pageAssets = new WeakMap(), pendingRequests = new Map(), responseRows = new Map();
-  const closingPages = new WeakSet(), observedPages = new Set(), requestFailures = [];
+  const closingPages = new WeakSet(), observedPages = new Set(), requestFailures = [], captureFailures = [];
   let probeReceipt, responseCount = 0, allFirstPartyReadsOverridden = true, allFirstPartyReadsAnonymous = true;
   let hardErrors = 0, fiveXX = 0, asset404 = 0, redirected = false, overflow = false, identityFailure = false;
   const coverage = { document: false, script: false, stylesheet: false, font: false, image: false, data: false, api: false };
@@ -67,6 +92,10 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
   const trackPage = page => {
     if (observedPages.has(page)) return;
     observedPages.add(page);
+    if (typeof page.context === 'function' && typeof page.context().newCDPSession === 'function') {
+      const attach = cache.watch(page).catch(() => { overflow = true; }).finally(() => pending.delete(attach));
+      pending.add(attach);
+    }
     // Observe the explicit caller teardown before Chromium cancels in-flight
     // reads. A real failure before close, including ERR_BLOCKED_BY_CLIENT, fails.
     if (typeof page.close === 'function') {
@@ -82,7 +111,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       && !(row.pathname === '/.well-known/locally-release' && row.aborted
         && probeReceipt?.status === 204 && probeReceipt.versionId === versionId));
     if (realFailures.length) { const error = new CandidateReleaseBlocked('candidate_request_failure'); error.requestFailures = realFailures; throw error; }
-    if (hardErrors || fiveXX || asset404 || overflow || redirected) throw new CandidateReleaseBlocked('candidate_http_or_asset_failure');
+    if (hardErrors || fiveXX || asset404 || overflow || redirected) { const error = new CandidateReleaseBlocked('candidate_http_or_asset_failure'); error.captureFailures = captureFailures; error.safetyCounts = { hardErrors, fiveXX, asset404, overflow, redirected }; throw error; }
     if (identityFailure || !allFirstPartyReadsOverridden) throw new CandidateReleaseBlocked('candidate_identity_unverified');
     if (!allFirstPartyReadsAnonymous) throw new CandidateReleaseBlocked('candidate_read_not_anonymous');
   };
@@ -91,10 +120,11 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     try {
       await Promise.race([(async () => { while (pending.size) await Promise.all([...pending]); })(),
         new Promise((_, reject) => { timer = setTimeout(() => reject(new CandidateReleaseBlocked('candidate_capture_timeout')), 1000); })]);
-    } finally { clearTimeout(timer); }
+    } catch (error) { error.cacheCaptureEvidence = { pendingCount: pending.size, requests: cache.diagnostics() }; throw error; } finally { clearTimeout(timer); }
     checkSafety();
   };
   const observeContext = async context => {
+    if (typeof context.newCDPSession === 'function') prepareCoverageContext(context, origin, cache.watch);
     context.on('page', trackPage);
     if (typeof context.close === 'function') {
       const close = context.close.bind(context);
@@ -116,7 +146,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       const row = pendingRequests.get(request);
       if (row?.pathname.startsWith('/_next/static/')) {
         const paths = pageAssets.get(row.page) ?? new Set(); paths.add(row.pathname); pageAssets.set(row.page, paths);
-        if (responseRows.has(request)) responseRows.get(request).bodyComplete = true;
+        if (responseRows.has(request) && responseRows.get(request).status === 200) responseRows.get(request).bodyComplete = true;
       }
       pendingRequests.delete(request);
     });
@@ -138,7 +168,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       const pathname = url.pathname, status = response.status(), api = pathname.startsWith('/api/');
       const type = api ? 'api' : ['fetch', 'xhr'].includes(request.resourceType()) ? 'data' : request.resourceType();
       if (Object.hasOwn(coverage, type) && (status === 200 || (api && status === 401))) coverage[type] = true;
-      if (status >= 300 && status < 400) redirected = true;
+      if (status >= 300 && status < 400 && status !== 304) redirected = true;
       if (status >= 400 && !(pathname === '/api/proxy-bookings' && status === 401)) hardErrors += 1;
       if (status >= 500) fiveXX += 1;
       const staticAsset = pathname.startsWith('/_next/static/');
@@ -147,6 +177,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       if (request.redirectedFrom()) redirected = true;
       const observedPage = pendingRequests.get(request)?.page;
       const capture = (async () => {
+        await cache.observe(response);
         const forwarded = forwardingProofs.get(request);
         const stateless = forwarded?.forwarding === 'stateless-read' && forwarded.anonymous === true;
         const overrideApplied = stateless || await request.headerValue('cloudflare-workers-version-overrides') === override;
@@ -154,8 +185,8 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
         if (!stateless && (await request.headerValue('cookie') !== null || await request.headerValue('authorization') !== null)) allFirstPartyReadsAnonymous = false;
         if (!overrideApplied || (pathname === '/.well-known/locally-release' && !probeApplied)) allFirstPartyReadsOverridden = false;
         if (staticAsset) {
-          const row = { pathname, status, overrideApplied, redirected: Boolean(request.redirectedFrom()) || status >= 300 && status < 400,
-            bodyComplete: Boolean(pageAssets.get(observedPage)?.has(pathname)) };
+          const row = { pathname, status, overrideApplied, redirected: Boolean(request.redirectedFrom()) || status >= 300 && status < 400 && status !== 304,
+            bodyComplete: status === 200 && Boolean(pageAssets.get(observedPage)?.has(pathname)) };
           browserAssetResponses.push(row); responseRows.set(request, row);
         } else if (request.method() !== 'OPTIONS' && (request.resourceType() === 'document' || api || ['fetch', 'xhr'].includes(request.resourceType()))) {
           if (pathname === '/.well-known/locally-release') {
@@ -164,7 +195,7 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
             probeReceipt = { pathname, versionId: observedVersion === versionId ? versionId : null, status, overrideApplied, probeApplied };
           } else workerReceipts.push({ pathname, overrideApplied });
         }
-      })().catch(() => { overflow = true; }).finally(() => pending.delete(capture));
+      })().catch(error => { captureFailures.push({ pathname, status, code: error.code ?? error.name, stage: error.cacheStage ?? 'response-capture', bytes: error.cacheBytes }); overflow = true; }).finally(() => pending.delete(capture));
       pending.add(capture);
     });
     const probe = await context.newPage(); trackPage(probe);
@@ -197,13 +228,14 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     for (const path of [...paths.refs, ...(pageRequests.get(page) ?? [])]) assetRefs.add(path);
     for (const path of paths.hints) hints.add(path);
     await drain();
+    await cache.checkpoint(page);
     if (page.isClosed()) throw new CandidateReleaseBlocked('candidate_capture_page_closed');
     assetEvidence.push({ pathname, refs: [...new Set([...paths.refs, ...(pageRequests.get(page) ?? [])])],
       browserCompleted: [...(pageAssets.get(page) ?? [])],
       browserPending: [...pendingRequests.values()].filter(row => row.page === page).map(row => ({ pathname: row.pathname, type: row.type })) });
   };
   const result = await runSmoke(origin, {
-    versionOverride: { workerName, versionId, onApplied: ({ pathname, resourceType, method, anonymous, forwarding }, request) => {
+    versionOverride: { workerName, versionId, onReadResponse: cache.onReadResponse, onApplied: ({ pathname, resourceType, method, anonymous, forwarding }, request) => {
       applied.add(`${method}:${pathname}`);
       if (request) forwardingProofs.set(request, { anonymous, forwarding });
       if (pathname.startsWith('/_next/static/')) {
@@ -241,6 +273,8 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
     unexpectedWrites: result.blockedUnexpectedWrites.length + result.blockedUnexpectedExternalWrites.length,
     versionMismatch: identityFailure, assetRefs: paths, assetResponses, browserAssetResponses, assetSetMatches: assetResponses.length === paths.length,
     resourceHintProofs: assetResponses.filter(row => hints.has(row.pathname)), assetEvidence, clientInteractions,
+    cacheValidationReceipts: cache.receipts,
+    coverageOwners: cache.coverageEvidence(),
     requestFailures: requestFailures.filter(row => !row.intentionalTeardown && !(row.pathname === '/.well-known/locally-release' && row.aborted && probeReceipt?.status === 204)),
     intentionalTeardownAborts: requestFailures.filter(row => row.intentionalTeardown).length,
     workerReceipts, probeReceipt, overrideCoverage: coverage, allFirstPartyReadsOverridden: allFirstPartyReadsOverridden && applied.size > 0,
@@ -250,7 +284,13 @@ export async function runCandidateBrowserSmoke({ origin, mode, workerName, versi
       httpHardErrors: hardErrors, fiveXX, asset404, genericError: a.genericErrorPresent,
       pageErrors: 0, consoleErrors: 0, unexpectedWrites: 0, versionMismatch: identityFailure })),
   };
-  assertFullCandidateSmoke(smoke);
+  try { assertFullCandidateSmoke(smoke); }
+  catch (error) {
+    error.cacheContractEvidence = { rows: smoke.browserAssetResponses.filter(r => r.status === 304),
+      receipts: smoke.cacheValidationReceipts, assets: smoke.assetResponses,
+      owners: smoke.coverageOwners.map(o => ({ ...o, scripts: o.scripts.filter(s => smoke.cacheValidationReceipts.some(r => r.executionProof?.scriptId === s.scriptId && r.executionProof?.ownerId === o.ownerId)) })) };
+    throw error;
+  }
   assertOverrideIdentity({ versionId, smoke, expectedOrigin: origin });
   return smoke;
 }

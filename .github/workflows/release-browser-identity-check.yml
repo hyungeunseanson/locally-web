@@ -3,6 +3,12 @@ name: Experimental Release Browser Identity
 on:
   pull_request:
     paths:
+      - 'scripts/cloudflare/candidate-read-transport*'
+      - 'scripts/cloudflare/candidate-coverage-owner*'
+      - 'scripts/cloudflare/candidate-cache-revalidation*'
+      - 'scripts/cloudflare/candidate-release-contract*'
+      - 'scripts/cloudflare/run-candidate-browser-smoke.mjs'
+      - 'scripts/cloudflare/run-production-browser-smoke*'
       - 'scripts/cloudflare/chromium8508456*'
       - 'scripts/cloudflare/chromium8508456-fixture/**'
       - 'scripts/cloudflare/download-chromium8508456-ci.mjs'
@@ -31,13 +37,13 @@ jobs:
       - name: Reject wrong platform, bytes, API version and runtime identity
         run: node --test scripts/cloudflare/verify-pinned-release-browser.test.mjs
       - name: Lint diagnostic helpers
-        run: npx eslint scripts/cloudflare/*chromium8508456*.mjs scripts/cloudflare/verify-pinned-release-browser*.mjs scripts/cloudflare/chromium8508456-fixture
+        run: npx eslint scripts/cloudflare/*chromium8508456*.mjs scripts/cloudflare/verify-pinned-release-browser*.mjs scripts/cloudflare/chromium8508456-fixture scripts/cloudflare/candidate-read-transport*.mjs scripts/cloudflare/candidate-cache-revalidation*.mjs scripts/cloudflare/candidate-coverage-owner*.mjs scripts/cloudflare/candidate-release-contract*.mjs scripts/cloudflare/run-candidate-browser-smoke.mjs scripts/cloudflare/run-production-browser-smoke*.mjs
       - run: git diff --check
 
       - name: Provision the unchanged bundled browser for existing contract fixtures
         run: npx playwright install --with-deps chromium
-      - name: Preserve existing candidate and production browser contracts
-        run: node --test scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs
+      - name: Preserve bundled Browser, pure Cache and Coverage contracts
+        run: node --test --test-concurrency=1 scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs scripts/cloudflare/candidate-read-transport.test.mjs scripts/cloudflare/candidate-cache-revalidation.test.mjs scripts/cloudflare/candidate-coverage-owner.test.mjs
 
   real-patched-browser:
     runs-on: macos-15
@@ -66,6 +72,10 @@ jobs:
           node scripts/cloudflare/download-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
       - name: Execute real normal streams, Next Flight, negatives and unchanged synthetic Gate
         run: node scripts/cloudflare/run-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
+      - name: Verify native cold/warm cache semantics and fail-closed 304 controls
+        run: node --test --test-concurrency=1 scripts/cloudflare/candidate-cache-revalidation.test.mjs scripts/cloudflare/candidate-cache-revalidation-browser.test.mjs scripts/cloudflare/candidate-coverage-owner.test.mjs
+      - name: Verify candidate forwarding and browser contracts with exact patched executable
+        run: node --test --test-concurrency=1 scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs scripts/cloudflare/candidate-read-transport.test.mjs
       - name: Retain sanitized local-only browser receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
