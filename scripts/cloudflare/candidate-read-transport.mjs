@@ -1,6 +1,6 @@
 import { resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { Agent } from 'undici';
+import { Agent, buildConnector } from 'undici';
 
 // Test-run scoped DNS resolution: do not fan out getaddrinfo once per concurrent
 // browser resource. Coalesce authoritative A lookups, respect their shortest TTL,
@@ -9,6 +9,7 @@ export function createCandidateReadTransport(origin, {
   resolve = hostname => resolve4(hostname, { ttl: true }),
   clock = Date.now, fetchImplementation = fetch,
   makeDispatcher = options => new Agent(options),
+  makeConnector = options => buildConnector(options),
 } = {}) {
   const expected = new URL(origin), host = expected.hostname;
   let entry, pending, closed = false;
@@ -39,8 +40,17 @@ export function createCandidateReadTransport(origin, {
   // through fresh HTTP/1.1 connections. Bound H2 streams to the existing read
   // concurrency. H1 still disables idle reuse; neither protocol replays errors.
   // TLS/hostname verification and each caller's original deadline stay intact.
+  const sockets = new Map(), connector = makeConnector({ lookup, allowH2: true });
+  const connect = (options, callback) => connector(options, (error, socket) => {
+    if (socket) {
+      const closed = new Promise(resolve => socket.once('close', resolve));
+      sockets.set(socket, closed);
+      socket.once('close', () => sockets.delete(socket));
+    }
+    callback(error, socket);
+  });
   const dispatcher = makeDispatcher({ connections: 8, pipelining: 0, allowH2: true,
-    maxConcurrentStreams: 8, connect: { lookup } });
+    maxConcurrentStreams: 8, connect });
   return {
     fetch: (url, options = {}) => {
       if (closed) throw new Error('Candidate transport closed');
@@ -52,7 +62,15 @@ export function createCandidateReadTransport(origin, {
     // Scope teardown must also dispose reset H2 sessions. Graceful close can wait
     // forever for a peer that kept a failed stream's session open. This is only
     // explicit cleanup; active request failures remain rejected and unreplayed.
-    close: async () => { closed = true; await dispatcher.destroy(); },
+    close: async () => {
+      closed = true;
+      // A failed socket can reject fetch before its close callbacks run. Let
+      // that exact lifecycle complete before disposing its client; otherwise
+      // Undici H2 cleanup can race its pending-index reset. No sleeps/retries.
+      await Promise.all([...sockets].filter(([socket]) => socket.destroyed)
+        .map(([, completion]) => completion));
+      await dispatcher.destroy();
+    },
     receipts: () => structuredClone(receipts),
   };
 }

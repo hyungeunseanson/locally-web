@@ -6,21 +6,21 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Agent } from 'undici';
+import { Agent, buildConnector } from 'undici';
 import { createCandidateReadTransport } from './candidate-read-transport.mjs';
 const origin='https://candidate.example';
 function fixture(options={}){
- let configuration,closed=0,fetches=0;
- const transport=createCandidateReadTransport(origin,{resolve:async()=>[{address:'192.0.2.1',ttl:10}],...options,makeDispatcher:o=>{configuration=o;return{destroy:async()=>closed++}},fetchImplementation:async(_url,o)=>{fetches++;return o}});
- return{transport,lookup:(host='candidate.example',opts={all:true})=>new Promise((resolve,reject)=>configuration.connect.lookup(host,opts,(e,address,family)=>e?reject(e):resolve({address,family}))),configuration:()=>configuration,counts:()=>({closed,fetches})};
+ let configuration,connectOptions,closed=0,fetches=0;
+ const transport=createCandidateReadTransport(origin,{resolve:async()=>[{address:'192.0.2.1',ttl:10}],...options,makeConnector:o=>{connectOptions=o;return()=>{}},makeDispatcher:o=>{configuration=o;return{destroy:async()=>closed++}},fetchImplementation:async(_url,o)=>{fetches++;return o}});
+ return{transport,lookup:(host='candidate.example',opts={all:true})=>new Promise((resolve,reject)=>connectOptions.lookup(host,opts,(e,address,family)=>e?reject(e):resolve({address,family}))),configuration:()=>configuration,connectOptions:()=>connectOptions,counts:()=>({closed,fetches})};
 }
 test('parallel candidate connections coalesce one DNS answer and expire at authoritative TTL',async()=>{
  let now=0,calls=0;
  const f=fixture({clock:()=>now,resolve:async()=>{calls++;await new Promise(r=>setImmediate(r));return[{address:'192.0.2.1',ttl:1}]}});
  const rows=await Promise.all(Array.from({length:8},()=>f.lookup()));assert.equal(calls,1);assert(rows.every(r=>r.address[0].address==='192.0.2.1'));
  now=999;await f.lookup();assert.equal(calls,1);now=1000;await f.lookup();assert.equal(calls,2);
-  assert.equal(f.configuration().connections,8);assert.equal(f.configuration().pipelining,0);assert.equal(f.configuration().connect.rejectUnauthorized,undefined);
-  assert.equal(f.configuration().allowH2,true);assert.equal(f.configuration().maxConcurrentStreams,8);
+  assert.equal(f.configuration().connections,8);assert.equal(f.configuration().pipelining,0);assert.equal(f.connectOptions().rejectUnauthorized,undefined);
+  assert.equal(f.connectOptions().allowH2,true);assert.equal(f.configuration().allowH2,true);assert.equal(f.configuration().maxConcurrentStreams,8);
  await f.transport.close();assert.equal(f.counts().closed,1);
 });
 test('DNS ENOTFOUND fails every waiting request without retry or stale fallback',async()=>{
@@ -66,10 +66,10 @@ test('fresh sockets still reject a real reset exactly once and do not retry', as
 
 // A generated certificate is trusted only by this loopback fixture's dispatcher.
 // The production constructor never changes CA, rejectUnauthorized or hostname.
-async function tlsFixture(handler) {
+async function tlsFixture(handler, hostname = 'localhost') {
   const directory = await mkdtemp(join(tmpdir(), 'candidate-h2-contract-'));
   const config = join(directory, 'openssl.cnf'), key = join(directory, 'key.pem'), cert = join(directory, 'cert.pem');
-  await writeFile(config, '[req]\ndistinguished_name=dn\nx509_extensions=v3\nprompt=no\n[dn]\nCN=localhost\n[v3]\nsubjectAltName=DNS:localhost\nbasicConstraints=critical,CA:TRUE\n');
+  await writeFile(config, '[req]\ndistinguished_name=dn\nx509_extensions=v3\nprompt=no\n[dn]\nCN='+hostname+'\n[v3]\nsubjectAltName=DNS:'+hostname+'\nbasicConstraints=critical,CA:TRUE\n');
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-config', config, '-keyout', key, '-out', cert], { stdio: 'ignore' });
   const ca = await readFile(cert), server = createSecureServer({ key: await readFile(key), cert: ca });
   const sessions = new Set(), calls = [];
@@ -79,7 +79,7 @@ async function tlsFixture(handler) {
   const local = `https://localhost:${server.address().port}`;
   const transport = (trusted = true) => createCandidateReadTransport(local, {
     resolve: async () => [{ address: '127.0.0.1', ttl: 60 }],
-    makeDispatcher: options => new Agent({ ...options, connect: { ...options.connect, ...(trusted ? { ca } : {}) } }),
+    makeConnector: options => buildConnector({ ...options, ...(trusted ? { ca } : {}) }),
   });
   return { local, transport, calls, close: async () => { for (const session of sessions) session.destroy(); await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }); } };
 }
@@ -116,4 +116,26 @@ test('H2 truncated content length fails instead of accepting partial bytes', asy
   const f = await tlsFixture(stream => { stream.respond({ ':status': 200, 'content-length': '100' }); stream.end('partial'); }), transport = f.transport();
   try { const response = await transport.fetch(f.local, { signal: AbortSignal.timeout(2000) }); assert.equal(response.status, 200); await assert.rejects(response.text()); assert.equal(f.calls.length, 1); }
   finally { await transport.close(); await f.close(); }
+});
+
+for (const failure of ['goaway', 'socket-close']) test(`concurrent H2 ${failure} rejects each request once and completes cleanup`, async () => {
+  const f = await tlsFixture(stream => {
+    if (failure === 'goaway') stream.session.goaway(h2.NGHTTP2_INTERNAL_ERROR);
+    else stream.session.destroy();
+  }), transport = f.transport();
+  try {
+    const rows = await Promise.allSettled(['/one', '/two', '/three'].map(path =>
+      transport.fetch(f.local + path, { signal: AbortSignal.timeout(2000) })));
+    assert(rows.every(row => row.status === 'rejected'));
+    assert.equal(f.calls.length, 3);
+    assert.equal(new Set(f.calls.map(row => row.path)).size, 3);
+  } finally { await transport.close(); await f.close(); }
+});
+
+test('trusted CA cannot bypass a mismatched TLS hostname', async () => {
+  const f = await tlsFixture(stream => { stream.respond({ ':status': 200 }); stream.end('must-not-load'); }, 'wrong.example'), transport = f.transport();
+  try {
+    await assert.rejects(transport.fetch(f.local, { signal: AbortSignal.timeout(2000) }), error => error.cause?.code === 'ERR_TLS_CERT_ALTNAME_INVALID');
+    assert.equal(f.calls.length, 0);
+  } finally { await transport.close(); await f.close(); }
 });
