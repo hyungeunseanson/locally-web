@@ -745,3 +745,43 @@ test('late informational notice between locale menu clicks is dismissed through 
   const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH}:{})});
   try{const page=await browser.newPage();await page.goto(origin);const result=await verifyReadOnlyClientInteraction(page);assert.equal(result.opened,true);assert.equal(result.closed,true);assert.equal(result.noticeDismissed,true);assert.equal(await page.evaluate(()=>window.dismissals),1);assert.equal(await page.getByRole('button',{name:'English',exact:true}).isVisible(),false);assert.equal(await page.evaluate(()=>document.querySelector('#locally-app-shell').hasAttribute('inert')),false);}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}
 });
+
+test('font304 release contract requires native font provenance; never substitutes script execution', () => {
+  const make = () => {
+    const s = makeSmoke(), path = '/_next/static/media/fixture.woff2', sha256 = 'a'.repeat(64);
+    s.assetRefs.push(path); s.assetResponses.push({ pathname: path, status: 200, overrideApplied: true, redirected: false, hashMatch: true, sha256 });
+    s.browserAssetResponses = [{ pathname: path, status: 304, bodyComplete: false, redirected: false, overrideApplied: true }];
+    s.coverageOwners = [{ ownerId: 'owner', targetId: 'target', generation: 1, snapshotId: 1, finalized: true, cleanupComplete: true,
+      audit: ['Profiler.startPreciseCoverage', 'Profiler.stopPreciseCoverage', 'Profiler.disable'].map(method => ({ method })) }];
+    s.cacheValidationReceipts = [{ pathname: path, status: 304, networkBodyBytes: 0, sha256, validatedCachedRepresentation: true, browserFinished: true, scriptExecuted: false, representationKind: 'font',
+      fontProof: { ownerId: 'owner', targetId: 'target', generation: 1, frameId: 'frame', requestId: 'second', predecessorId: 'first', additionalHTTPReads: 0, rendered: true, loaded: true, sourceURLMatches: true, customFont: true, glyphCount: 6, sha256, provenance: 'native-predecessor-body-and-current-decoded-font' } }]; return s;
+  };
+  assertFullCandidateSmoke(make());
+  for (const mutate of [s => { delete s.cacheValidationReceipts[0].fontProof; }, s => { s.cacheValidationReceipts[0].scriptExecuted = true; },
+    ...['rendered', 'loaded', 'sourceURLMatches', 'customFont'].map(key => s => { s.cacheValidationReceipts[0].fontProof[key] = false; }),
+    ...['ownerId', 'targetId', 'sha256', 'provenance'].map(key => s => { s.cacheValidationReceipts[0].fontProof[key] = 'wrong'; }),
+    s => { s.cacheValidationReceipts[0].fontProof.additionalHTTPReads = 1; }, s => { s.cacheValidationReceipts[0].fontProof.glyphCount = 0; }, s => { s.cacheValidationReceipts[0].fontProof.generation = 2; },
+    s => { s.cacheValidationReceipts[0].fontProof.predecessorId = 'second'; }, s => { s.cacheValidationReceipts[0].fontProof.frameId = ''; },
+    s => { s.cacheValidationReceipts[0].pathname = '/_next/static/chunks/fixture.js'; }]) {
+    const s = make(); mutate(s); assert.throws(() => assertFullCandidateSmoke(s), blocked('candidate_cache_revalidation_failed'));
+  }
+});
+
+test('non-executable font304 requires the current native cached body and terminal bytes; never claims execution', () => {
+  const make = () => {
+    const s = makeSmoke(), pathname = '/_next/static/media/fixture.woff2', sha256 = 'a'.repeat(64);
+    s.assetRefs.push(pathname); s.assetResponses.push({ pathname, status: 200, overrideApplied: true, redirected: false, hashMatch: true, sha256 });
+    s.browserAssetResponses = [{ pathname, status: 304, bodyComplete: false, redirected: false, overrideApplied: true }];
+    s.coverageOwners = [{ ownerId: 'owner', targetId: 'target', generation: 1, snapshotId: 1, finalized: true, cleanupComplete: true,
+      audit: ['Profiler.startPreciseCoverage', 'Profiler.stopPreciseCoverage', 'Profiler.disable'].map(method => ({ method })) }];
+    s.cacheValidationReceipts = [{ pathname, status: 304, networkBodyBytes: 0, sha256, validatedCachedRepresentation: true, browserFinished: true, scriptExecuted: false, representationKind: 'font',
+      fontProof: { ownerId: 'owner', targetId: 'target', generation: 1, frameId: 'frame', requestId: 'second', predecessorId: 'first', nativeCachedBody: true, nativeBodyBytes: 100, terminalDecodedBytes: 100, sha256, rendered: false, provenance: 'current-native-response-body' } }]; return s;
+  };
+  assertFullCandidateSmoke(make());
+  for (const mutate of [s => { s.cacheValidationReceipts[0].fontProof.nativeCachedBody = false; }, s => { s.cacheValidationReceipts[0].fontProof.rendered = true; },
+    s => { s.cacheValidationReceipts[0].fontProof.nativeBodyBytes = 0; }, s => { s.cacheValidationReceipts[0].fontProof.terminalDecodedBytes++; },
+    s => { s.cacheValidationReceipts[0].fontProof.sha256 = 'b'.repeat(64); }, s => { s.cacheValidationReceipts[0].fontProof.provenance = 'node-body'; },
+    s => { s.cacheValidationReceipts[0].fontProof.targetId = 'other'; }, s => { s.cacheValidationReceipts[0].scriptExecuted = true; }]) {
+    const s = make(); mutate(s); assert.throws(() => assertFullCandidateSmoke(s), blocked('candidate_cache_revalidation_failed'));
+  }
+});

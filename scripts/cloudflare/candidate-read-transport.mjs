@@ -1,13 +1,16 @@
 import { resolve4 } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { Agent, buildConnector } from 'undici';
+import { Agent, buildConnector, fetch as dispatcherFetch } from 'undici';
 
+// Keep fetch and its dispatcher on the same locked Undici implementation. Node
+// embeds a different Undici revision; do not mix its fetch body handler with this
+// package's experimental H2 dispatcher. No network failure is swallowed/replayed.
 // Test-run scoped DNS resolution: do not fan out getaddrinfo once per concurrent
 // browser resource. Coalesce authoritative A lookups, respect their shortest TTL,
 // and fail on resolver errors. No application-level retry, stale fallback or TLS bypass.
 export function createCandidateReadTransport(origin, {
   resolve = hostname => resolve4(hostname, { ttl: true }),
-  clock = Date.now, fetchImplementation = fetch,
+  clock = Date.now, fetchImplementation = dispatcherFetch,
   makeDispatcher = options => new Agent(options),
   makeConnector = options => buildConnector(options),
 } = {}) {
