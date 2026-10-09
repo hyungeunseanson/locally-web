@@ -117,3 +117,121 @@ test('late304 uses the single owner final snapshot without a second coverage con
     assert.deepEqual(snapshot.audit.filter(r => r.method === 'Profiler.takePreciseCoverage').map(r => r.caller), ['cache-gate', 'before-teardown']);
   } finally { await context.close(); await browser.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); }
 });
+
+for (const fault of ['none', 'parallel', 'unused-cached-face', 'activation-network', 'lost-native-body', 'wrong-native-body', 'wrong-current-font', 'ambiguous-font-source', 'system-fallback', 'glyph-mismatch']) test(`real decoded font304: ${fault}`, { timeout: 15000 }, async () => {
+  const { readFile } = await import('node:fs/promises');
+  const fontBytes = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
+  const path = '/_next/static/media/fixture.woff2', paths = [path, ...(fault === 'parallel' ? [1, 2, 3].map(i => '/_next/static/media/fixture' + i + '.woff2') : [])], calls = [], errors = [], jobs = [];
+  const server = createServer((req, res) => {
+    if (paths.includes(req.url)) {
+      const warm = Boolean(req.headers['if-none-match']); calls.push({ warm, override: req.headers['cloudflare-workers-version-overrides'] });
+      res.writeHead(warm ? 304 : 200, { 'content-type': 'font/woff2', etag: '"font"', 'cache-control': 'public,max-age=0,must-revalidate' }).end(warm ? undefined : fontBytes);
+    } else if (req.url === '/_next/static/chunks/font.css') res.writeHead(200, { 'content-type': 'text/css' }).end(paths.map((p, i) => '@font-face{font-family:fixture' + i + ';src:url(../media/' + p.split('/').at(-1) + ')}').join(''));
+    else res.writeHead(200, { 'content-type': 'text/html' }).end('<link rel="stylesheet" href="/_next/static/chunks/font.css">' + (['unused-cached-face', 'activation-network'].includes(fault) ? '<link rel="preload" as="font" crossorigin="anonymous" href="' + path + '">' : '') + paths.map((p, i) => '<span style="font-family:' + (['unused-cached-face', 'activation-network'].includes(fault) ? 'sans-serif' : 'fixture' + i) + '">Aa0123</span>').join(''));
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r)); const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await launch(), context = await browser.newContext({ serviceWorkers: 'block' });
+  const observer = createCacheRevalidationObserver({ origin, override, readAsset: async () => fontBytes });
+  prepareCoverageContext(context, origin, observer.watch);
+  try {
+    await installProductionMutationGate(context, origin, { versionOverride: { workerName, versionId, onReadResponse: async (proof, request) => {
+      try { await observer.onReadResponse(proof, request); }
+      catch (e) { errors.push({ code: e.code, stage: e.cacheStage, ...(e.cacheCaptureEvidence ? { identity: e.cacheCaptureEvidence } : {}) }); throw e; }
+    } } });
+    context.on('response', r => jobs.push(observer.observe(r).catch(e => errors.push({ code: e.code, stage: e.cacheStage }))));
+    const page = await context.newPage(), owner = coverageOwnerFor(page, origin), cdp = await owner.ready;
+    await page.goto(origin, { waitUntil: 'load' }); await page.evaluate(() => document.fonts.ready); await Promise.all(jobs); assert.deepEqual(errors, []);
+    if (['unused-cached-face', 'activation-network'].includes(fault)) await page.evaluate(() => {
+      // Deterministically enter the unused-face API state; body, decoded font,
+      // CSS source, platform glyphs and HTTP counts remain actual Chromium data.
+      const status = Object.getOwnPropertyDescriptor(FontFace.prototype, 'status').get, load = FontFace.prototype.load;
+      let activated = false;
+      Object.defineProperty(FontFace.prototype, 'status', { configurable: true, get() { return this.family === 'fixture0' && !activated ? 'unloaded' : status.call(this); } });
+      FontFace.prototype.load = function () { if (this.family === 'fixture0') activated = true; return load.call(this); };
+    });
+    const send = cdp.send.bind(cdp), statuses = new Map();
+    cdp.on('Network.responseReceived', e => statuses.set(e.requestId, e.response.status));
+    // Exercise the decoded FontResource path explicitly. Its predecessor body
+    // and renderer proof still come from the real browser, not injected bytes.
+    if (!fault.includes('native-body')) cdp.send = (method, params) => {
+      if (method === 'Network.getResponseBody' && statuses.get(params.requestId) === 304) return Promise.reject(new Error('No data found for resource with given identifier'));
+      return send(method, params);
+    };
+    if (fault.includes('native-body')) cdp.send = (method, params) => {
+      if (method === 'Network.getResponseBody') {
+        if (fault === 'lost-native-body') return Promise.reject(new Error('missing native predecessor'));
+        return Promise.resolve({ body: Buffer.alloc(fontBytes.length, 1).toString('base64'), base64Encoded: true });
+      }
+      return send(method, params);
+    };
+    if (['system-fallback', 'glyph-mismatch'].includes(fault)) cdp.send = async (method, params) => {
+      if (method === 'Network.getResponseBody' && statuses.get(params.requestId) === 304) throw new Error('No data found for resource with given identifier');
+      const result = await send(method, params);
+      if (method === 'CSS.getPlatformFontsForNode') return { fonts: result.fonts.map(f => ({ ...f, ...(fault === 'system-fallback' ? { isCustomFont: false } : { glyphCount: 0 }) })) };
+      return result;
+    };
+    if (fault === 'wrong-current-font') await page.evaluate(() => { document.styleSheets[0].cssRules[0].style.setProperty('src', 'local("Arial")'); });
+    if (fault === 'ambiguous-font-source') await page.evaluate(path => { document.styleSheets[0].cssRules[0].style.setProperty('src', 'url(' + path + '),local("Arial")'); }, path);
+    if (fault === 'activation-network') await page.evaluate(path => { const load = FontFace.prototype.load; FontFace.prototype.load = async function () { if (this.family === 'fixture0' && this.status === 'unloaded') await (await fetch(path, { cache: 'no-store' })).arrayBuffer(); return load.call(this); }; }, path);
+    // Force the local conditional experiment after the proven native200. A missing
+    // cached FontResource/body still fails; never retry a cold load into a PASS.
+    await context.setExtraHTTPHeaders({ 'If-None-Match': '"font"' });
+    // Await each actual terminal notification before draining response jobs.
+    // FontFace.load resolves on the renderer channel; PW response events can
+    // follow it. A snapshot taken earlier can miss the negative proof entirely.
+    const terminals = paths.map(path => new Promise(resolve => {
+      const cleanup = () => { page.off('response', response); page.off('requestfailed', failed); };
+      const response = r => { if (r.url() === origin + path && r.status() === 304) { cleanup(); resolve(); } };
+      const failed = r => { if (r.url() === origin + path) { cleanup(); resolve(); } };
+      page.on('response', response); page.on('requestfailed', failed);
+    }));
+    try {
+      await page.evaluate(async paths => { await Promise.all(paths.map(async (path, i) => { const f = new FontFace('trigger' + i, 'url(' + path + ')'); document.fonts.add(f); await f.load(); })); }, paths.map(p => origin + p));
+    } catch (error) {
+      // A negative can also reject the native FontFace. It only passes this
+      // control if the cache observer independently records a failed proof.
+      if (['none', 'parallel', 'unused-cached-face'].includes(fault)) throw error;
+    }
+    await Promise.all(terminals); await Promise.all(jobs);
+    assert.equal(calls.length, paths.length * 2 + (fault === 'activation-network' ? 1 : 0)); assert.deepEqual(calls.map(r => r.warm), [...paths.map(() => false), ...paths.map(() => true), ...(fault === 'activation-network' ? [true] : [])]); assert(calls.every(r => r.override === override));
+    if (['none', 'parallel', 'unused-cached-face'].includes(fault)) {
+      assert.deepEqual(errors, []);
+      assert.equal(observer.receipts.length, paths.length); await observer.checkpoint(page);
+      const receipt = observer.receipts[0]; assert.equal(receipt.representationKind, 'font'); assert.equal(receipt.scriptExecuted, false);
+      assert.equal(receipt.sha256, cacheDigest(fontBytes)); assert.equal(receipt.fontProof.rendered, true); assert.equal(receipt.fontProof.glyphCount, 6);
+      assert.equal(receipt.fontProof.provenance, 'native-predecessor-body-and-current-decoded-font'); assert.equal(receipt.fontProof.additionalHTTPReads, 0);
+      if (fault === 'unused-cached-face') assert.equal(receipt.fontProof.cachedFaceActivated, true);
+      await page.close(); assert.equal(owner.read().cleanupComplete, true);
+    } else { assert(errors.length > 0 || observer.diagnostics().some(e => e.nativeError === 'candidate_cache_revalidation_failed'), 'actual font proof failure must never PASS'); if (fault === 'activation-network') assert(errors.some(e => e.stage === 'font-probe-network-read')); }
+  } finally { await context.close(); await browser.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); }
+});
+
+for (const corrupt of [false, true]) test(`fulfilled font200 crossing page close ${corrupt ? 'keeps corrupt native proof FAIL' : 'finishes native proof before owner detaches'}`, { timeout: 15000 }, async () => {
+  const { readFile } = await import('node:fs/promises');
+  const fontBytes = await readFile(new URL('../../app/fonts/Inter/Inter_18pt-Regular.woff2', import.meta.url));
+  let release; const held = new Promise(r => { release = r; });
+  const server = createServer(async (req, res) => {
+    if (req.url.endsWith('.woff2')) { await held; res.writeHead(200, { 'content-type': 'font/woff2', etag: '"font"' }).end(fontBytes); }
+    else res.writeHead(200, { 'content-type': 'text/html' }).end('<style>@font-face{font-family:fixture;src:url(/_next/static/media/fixture.woff2)}span{font-family:fixture}</style><span>Aa0123</span>');
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r)); const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await launch(), context = await browser.newContext({ serviceWorkers: 'block' });
+  const observer = createCacheRevalidationObserver({ origin, override, readAsset: async () => fontBytes }), jobs = [], errors = [];
+  prepareCoverageContext(context, origin, observer.watch);
+  let resolveClosed; const closed = new Promise(r => { resolveClosed = r; });
+  try {
+    await installProductionMutationGate(context, origin, { versionOverride: { workerName, versionId, onReadResponse: async (proof, request) => {
+      await observer.onReadResponse(proof, request);
+      if (request.resourceType() === 'font') request.frame().page().close().then(() => resolveClosed(null), e => resolveClosed(e));
+    } } });
+    context.on('response', r => jobs.push(observer.observe(r).catch(e => errors.push(e))));
+    const page = await context.newPage(), owner = coverageOwnerFor(page, origin), cdp = await owner.ready, send = cdp.send.bind(cdp);
+    if (corrupt) cdp.send = (method, params) => method === 'Network.getResponseBody'
+      ? Promise.resolve({ body: Buffer.alloc(fontBytes.length, 1).toString('base64'), base64Encoded: true }) : send(method, params);
+    await page.goto(origin, { waitUntil: 'domcontentloaded' }); release();
+    const error = await closed; await Promise.all(jobs);
+    if (corrupt) { assert.equal(error.code, 'candidate_cache_revalidation_failed'); assert(errors.some(e => e.cacheStage === 'full200-hash')); }
+    else { assert.equal(error, null); assert.deepEqual(errors, []); }
+    assert.equal(page.isClosed(), true); assert.equal(owner.read().cleanupComplete, true);
+  } finally { release(); await context.close(); await browser.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); }
+});

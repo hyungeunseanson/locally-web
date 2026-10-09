@@ -139,3 +139,34 @@ test('trusted CA cannot bypass a mismatched TLS hostname', async () => {
     assert.equal(f.calls.length, 0);
   } finally { await transport.close(); await f.close(); }
 });
+
+test('peer H2 settings cannot expand the eight-body read bound', async () => {
+  let peak = 0, active = 0; const streams = new Set();
+  const f = await tlsFixture(stream => {
+    active++; peak = Math.max(peak, active); streams.add(stream);
+    stream.respond({ ':status': 200 }); stream.write('partial');
+    stream.once('close', () => { active--; streams.delete(stream); });
+  }), transport = f.transport();
+  try {
+    const reads = Array.from({ length: 20 }, (_, i) => transport.fetch(f.local + '/' + i, { signal: AbortSignal.timeout(2000) }).then(r => r.text()));
+    // Release actual bodies in batches. This interval is only the local peer's
+    // deterministic stream scheduler, not a transport retry or deadline extension.
+    const timer = setInterval(() => { for (const stream of streams) stream.end('-complete'); }, 50);
+    try { assert((await Promise.all(reads)).every(body => body === 'partial-complete')); }
+    finally { clearInterval(timer); }
+    assert(peak <= 8, 'actual active H2 bodies must stay bounded despite peer settings: ' + peak);
+    assert.equal(f.calls.length, 20);
+  } finally { await transport.close(); await f.close(); }
+});
+
+test('default fetch and H2 dispatcher share the locked Undici stack', async () => {
+  const { Response: DispatcherResponse } = await import('undici');
+  let calls = 0; const server = createServer((_req, res) => { calls++; res.end('same-stack-body'); });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const local = `http://127.0.0.1:${server.address().port}`, transport = createCandidateReadTransport(local);
+  try {
+    const response = await transport.fetch(local, { signal: AbortSignal.timeout(1000), redirect: 'error' });
+    assert(response instanceof DispatcherResponse); assert.equal(response.url, local + '/');
+    assert.equal(await response.text(), 'same-stack-body'); assert.equal(calls, 1);
+  } finally { await transport.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); }
+});

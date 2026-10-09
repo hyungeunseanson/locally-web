@@ -269,7 +269,22 @@ export function assertFullCandidateSmoke(smoke) {
     requireCondition(row.bodyComplete === false && row.redirected === false && row.overrideApplied === true
       && smoke.cacheValidationReceipts?.some(receipt => receipt.pathname === row.pathname && receipt.status === 304
         && receipt.networkBodyBytes === 0 && receipt.validatedCachedRepresentation === true
-        && receipt.browserFinished === true && receipt.scriptExecuted === true
+        && receipt.browserFinished === true
+        && (receipt.representationKind === 'font'
+          ? /^\/_next\/static\/media\/[\w.-]+\.woff2$/.test(receipt.pathname)
+            && receipt.scriptExecuted === false
+            && ((receipt.fontProof?.provenance === 'current-native-response-body'
+                && receipt.fontProof.nativeCachedBody === true && receipt.fontProof.rendered === false
+                && receipt.fontProof.nativeBodyBytes > 0 && receipt.fontProof.terminalDecodedBytes === receipt.fontProof.nativeBodyBytes)
+              || (receipt.fontProof?.provenance === 'native-predecessor-body-and-current-decoded-font'
+                && receipt.fontProof.additionalHTTPReads === 0 && receipt.fontProof.rendered === true && receipt.fontProof.loaded === true && receipt.fontProof.sourceURLMatches === true
+                && receipt.fontProof.customFont === true && receipt.fontProof.glyphCount === 6))
+            && receipt.fontProof.sha256 === receipt.sha256
+            && Boolean(receipt.fontProof.frameId && receipt.fontProof.requestId && receipt.fontProof.predecessorId)
+            && receipt.fontProof.requestId !== receipt.fontProof.predecessorId
+            && smoke.coverageOwners?.some(owner => owner.ownerId === receipt.fontProof.ownerId
+              && owner.targetId === receipt.fontProof.targetId && receipt.fontProof.generation <= owner.generation)
+          : (receipt.scriptExecuted === true
         && receipt.executionProof?.executed === true && receipt.executionProof.sha256 === receipt.sha256
         && smoke.coverageOwners?.some(owner => owner.ownerId === receipt.executionProof.ownerId
           && owner.targetId === receipt.executionProof.targetId && receipt.executionProof.snapshotId > 0
@@ -277,7 +292,7 @@ export function assertFullCandidateSmoke(smoke) {
           && owner.scripts.some(script => script.scriptId === receipt.executionProof.scriptId
             && script.executionContextId === receipt.executionProof.executionContextId
             && script.generation === receipt.executionProof.generation && script.sha256 === receipt.sha256
-            && script.ranges.some(range => range.count > 0)))
+            && script.ranges.some(range => range.count > 0)))))
         && smoke.assetResponses.some(asset => asset.pathname === receipt.pathname && asset.status === 200
           && asset.hashMatch === true && asset.sha256 === receipt.sha256)), 'candidate_cache_revalidation_failed');
   }

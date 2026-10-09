@@ -77,3 +77,78 @@ test('native body latch rejects oversized data and never completes truncated dat
   const truncated=nativeBodyLatch(4,async()=>{reads++},assert.fail,assert.fail);truncated.data(3);truncated.finish();await new Promise(r=>setImmediate(r));assert.equal(reads,0);
   const failure=Error('fixture body error');const broken=nativeBodyLatch(4,async()=>{throw failure},assert.fail,e=>{rejected=e});broken.data(4);broken.finish();await new Promise(r=>setImmediate(r));assert.equal(rejected,failure);
 });
+
+function fontFixture() {
+  const f = fixture();
+  for (const row of [f.previous, f.current]) {
+    row.url = 'http://localhost/_next/static/media/fixture.woff2'; row.resourceType = 'font';
+    row.nativeIdentity = { ownerId: 'one', targetId: 'target', generation: 1, frameId: 'frame', requestId: row.status === 200 ? 'first' : 'second' };
+  }
+  f.previous.responseHeaders.set('content-type', 'font/woff2'); f.current.nativeIdentity.predecessorId = 'first';
+  return f;
+}
+test('font304 requires native predecessor lineage as well as every existing cache validator', () => {
+  const f = fontFixture(), receipt = validateCachedResponse(f.previous, f.current, override);
+  assert.equal(receipt.representationKind, 'font'); assert.equal(receipt.scriptExecuted, false);
+});
+for (const [name, mutate] of Object.entries({
+  cold: f => { f.previous = null; },
+  'wrong native request': f => { f.current.nativeIdentity.predecessorId = 'other'; },
+  'same request': f => { f.current.nativeIdentity.requestId = 'first'; },
+  'wrong frame': f => { f.current.nativeIdentity.frameId = 'other'; },
+  'wrong target': f => { f.current.nativeIdentity.targetId = 'other'; },
+  'wrong generation': f => { f.current.nativeIdentity.generation++; },
+  'wrong owner': f => { f.current.nativeIdentity.ownerId = 'other'; },
+  'missing native identity': f => { delete f.previous.nativeIdentity; },
+  'wrong 304 MIME': f => { f.current.responseHeaders.set('content-type', 'text/html'); },
+  'wrong MIME': f => { f.previous.responseHeaders.set('content-type', 'text/html'); },
+  'wrong validator': f => { f.current.requestHeaders.set('if-none-match', '"wrong"'); },
+  'wrong cached SHA': f => { f.current.browserSHA256 = 'a'.repeat(64); },
+  'wrong bytes': f => { f.current.browserBytes++; },
+  'wrong artifact': f => { f.current.localSHA256 = 'a'.repeat(64); },
+  cookie: f => { f.current.requestHeaders.set('cookie', 'forbidden'); },
+  authorization: f => { f.current.requestHeaders.set('authorization', 'forbidden'); },
+  'wrong version': f => { f.current.requestHeaders.set('cloudflare-workers-version-overrides', 'other'); },
+  'wrong encoding': f => { f.current.responseHeaders.set('content-encoding', 'gzip'); },
+  'wrong Vary': f => { f.current.responseHeaders.set('vary', 'Accept-Language'); },
+  query: f => { f.current.url += '?anything=1'; },
+  'nonzero 304 body': f => { f.current.networkBytes = 1; },
+})) test(`font304 rejects ${name}`, () => { const f = fontFixture(); mutate(f); assert.throws(() => validateCachedResponse(f.previous, f.current, override), { code: 'candidate_cache_revalidation_failed' }); });
+
+for (const fault of ['system-font', 'zero-glyphs', 'different-face', 'additional-read', 'changed-document']) test(`decoded font probe independently rejects ${fault}`, async () => {
+  const { proveCachedFont } = await import('./candidate-cache-revalidation-font.mjs');
+  const identity = { ownerId: 'one', targetId: 'target', generation: 1, frameId: 'frame', requestId: 'second', predecessorId: 'first' };
+  let evaluations = 0, snapshots = 0, readCounts = 0, glyphReads = 0;
+  const page = { isClosed: () => false, evaluate: async () => { evaluations++; return { loaded: true, sourceURLMatches: true }; } };
+  const owner = { read: () => ({ targetId: fault === 'changed-document' && snapshots++ > 0 ? 'other' : 'target', generation: 1, finalized: false }) };
+  const cdp = { send: async method => {
+    if (method === 'DOM.getDocument') return { root: { nodeId: 1 } };
+    if (method === 'DOM.querySelector') return { nodeId: 2 };
+    if (method === 'CSS.getPlatformFontsForNode') return { fonts: [{ familyName: fault === 'different-face' && glyphReads++ > 0 ? 'other' : 'fixture', postScriptName: 'fixture', glyphCount: fault === 'zero-glyphs' ? 0 : 6, isCustomFont: fault !== 'system-font' }] };
+    return {};
+  } };
+  await assert.rejects(proveCachedFont({ page, cdp, owner, url: 'http://localhost/_next/static/media/fixture.woff2', bytes,
+    identity, readCount: () => fault === 'additional-read' ? readCounts++ : 0 }), { code: 'candidate_cache_revalidation_failed' });
+  assert.equal(evaluations, 2, 'even a rejected proof must remove its transient face/probes');
+});
+
+for (const delayed of [false, true]) test(`native request identity waits for its actual CDP event (${delayed})`, async () => {
+  const { awaitNativeStream } = await import('./candidate-cache-revalidation.mjs');
+  const state = { streams: new Map(), requestWaiters: new Set() }, row = { url: 'https://fixture.test/a', requestId: 'native-1', claimed: false };
+  if (!delayed) state.streams.set(row.requestId, row);
+  const waiting = awaitNativeStream(state, row.url);
+  if (delayed) queueMicrotask(() => { state.streams.set(row.requestId, row); for (const notify of [...state.requestWaiters]) notify(); });
+  assert.deepEqual(await waiting, [row]); assert.equal(state.requestWaiters.size, 0);
+});
+test('native request identity never chooses among ambiguous native events', async () => {
+  const { awaitNativeStream } = await import('./candidate-cache-revalidation.mjs');
+  const state = { streams: new Map(), requestWaiters: new Set() };
+  for (const requestId of ['one', 'two']) state.streams.set(requestId, { url: 'https://fixture.test/a', requestId });
+  assert.equal((await awaitNativeStream(state, 'https://fixture.test/a')).length, 2);
+});
+test('missing native event still fails within the original capture budget and cleans up', async () => {
+  const { awaitNativeStream } = await import('./candidate-cache-revalidation.mjs');
+  const state = { streams: new Map(), requestWaiters: new Set() };
+  await assert.rejects(awaitNativeStream(state, 'https://fixture.test/a'), e => e.code === 'candidate_cache_revalidation_failed' && e.cacheStage === 'native-stream-request-event');
+  assert.equal(state.requestWaiters.size, 0);
+});
