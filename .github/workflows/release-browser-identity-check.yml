@@ -42,7 +42,7 @@ jobs:
 
       - name: Provision the unchanged bundled browser for existing contract fixtures
         run: npx playwright install --with-deps chromium
-      - name: Preserve existing candidate and production browser contracts
+      - name: Preserve bundled Browser, pure Cache and Coverage contracts
         run: node --test --test-concurrency=1 scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs scripts/cloudflare/candidate-read-transport.test.mjs scripts/cloudflare/candidate-cache-revalidation.test.mjs scripts/cloudflare/candidate-coverage-owner.test.mjs
 
   real-patched-browser:
@@ -73,7 +73,7 @@ jobs:
       - name: Execute real normal streams, Next Flight, negatives and unchanged synthetic Gate
         run: node scripts/cloudflare/run-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
       - name: Verify native cold/warm cache semantics and fail-closed 304 controls
-        run: node --test --test-concurrency=1 scripts/cloudflare/candidate-cache-revalidation.test.mjs scripts/cloudflare/candidate-coverage-owner.test.mjs
+        run: node --test --test-concurrency=1 scripts/cloudflare/candidate-cache-revalidation.test.mjs scripts/cloudflare/candidate-cache-revalidation-browser.test.mjs scripts/cloudflare/candidate-coverage-owner.test.mjs
       - name: Verify candidate forwarding and browser contracts with exact patched executable
         run: node --test --test-concurrency=1 scripts/cloudflare/candidate-release-contract.test.mjs scripts/cloudflare/run-production-browser-smoke.test.mjs scripts/cloudflare/candidate-read-transport.test.mjs
       - name: Retain sanitized local-only browser receipts

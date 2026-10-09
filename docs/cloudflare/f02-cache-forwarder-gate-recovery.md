@@ -81,7 +81,11 @@ Forwarding diagnostics distinguish fetch/body/observer/fulfill failure; the actu
 truncation control receives35 decoded bytes before explicit truncation/socket failure,
 then browser `ERR_FAILED`, with one request, no fulfill and no JS execution.
 
-CI runs existing bundled contracts and the real pinned ARM64 browser separately,
+CI runs existing bundled contracts plus37 pure Cache controls, and8 native304
+integrations only on the verified pinned ARM64 release browser. No tests are skipped
+or removed; both CI jobs are required. The bundled renderer can reuse a same-document
+script without emitting a conditional request, so it cannot establish native304
+integration evidence. All controls are still executed separately,
 including normal/Next Flight integration and negative controls. SEO, Foundation,
 backup/restore and Chat retain their existing workflows. The final exact-head CI
 result belongs to the PR checks; local read-only success is not a CI success claim.
