@@ -1,0 +1,903 @@
+{
+  "origin": "https://www.locally-travel.com",
+  "workerName": "locally-web-opennext-production",
+  "baselineVersion": "7e708856-9cf7-41f4-9b99-6401a516c7d2",
+  "candidateVersion": "b24b84c9-00f0-4db6-b96c-0b929c7d347e",
+  "artifactSHA256": "f8f59854ac6bc2e15692663136045696dddaf78ed223bdec2b3da31328a4eda1",
+  "applicationSource": "e4933ce1c00707b792e69911a0791726a6a7e956",
+  "protectedSourceSHA256": {
+    "package.json": "0a752a1b5dc9addfab53b285aa3dbb14962fd286a5b13ad1b0b88fa5da6ec871",
+    "package-lock.json": "bf65907c71c34dc4fe5accc2ab882826b4d9299f68ae9c9e580a33f1354a2917",
+    "wrangler.jsonc": "9d358bd9cbcc57a528b2ce1c41259b184d07ce68eee8bfdd47a70726a3a52dcf",
+    "cloudflare-worker.ts": "a8a80a81fcaf9967a4e9b67f25cc8297b07236b412fa0ae2300fe5b571e08bbc"
+  },
+  "databaseObservedAt": "2026-10-09T08:14:47.462Z",
+  "publicExpected": {
+    "urls": [
+      "https://www.locally-travel.com",
+      "https://www.locally-travel.com/about",
+      "https://www.locally-travel.com/become-a-host",
+      "https://www.locally-travel.com/community",
+      "https://www.locally-travel.com/community/abbff5d6-4f6b-4ffa-b5e0-8e6d0815f242",
+      "https://www.locally-travel.com/community/c17ce39a-2dfc-496d-95fb-c9bd2a8cfdf1",
+      "https://www.locally-travel.com/company/careers",
+      "https://www.locally-travel.com/company/investors",
+      "https://www.locally-travel.com/company/news",
+      "https://www.locally-travel.com/company/notices",
+      "https://www.locally-travel.com/company/partnership",
+      "https://www.locally-travel.com/experiences/3071",
+      "https://www.locally-travel.com/experiences/3081",
+      "https://www.locally-travel.com/experiences/3188",
+      "https://www.locally-travel.com/experiences/3253",
+      "https://www.locally-travel.com/experiences/3307",
+      "https://www.locally-travel.com/experiences/3308",
+      "https://www.locally-travel.com/experiences/3309",
+      "https://www.locally-travel.com/experiences/3331",
+      "https://www.locally-travel.com/experiences/3343",
+      "https://www.locally-travel.com/experiences/3402",
+      "https://www.locally-travel.com/experiences/3403",
+      "https://www.locally-travel.com/experiences/3404",
+      "https://www.locally-travel.com/experiences/3405",
+      "https://www.locally-travel.com/experiences/3410",
+      "https://www.locally-travel.com/experiences/3416",
+      "https://www.locally-travel.com/experiences/3439",
+      "https://www.locally-travel.com/experiences/3496",
+      "https://www.locally-travel.com/experiences/3570",
+      "https://www.locally-travel.com/experiences/3664",
+      "https://www.locally-travel.com/experiences/3861",
+      "https://www.locally-travel.com/experiences/4262",
+      "https://www.locally-travel.com/experiences/4313",
+      "https://www.locally-travel.com/experiences/4397",
+      "https://www.locally-travel.com/experiences/4413",
+      "https://www.locally-travel.com/experiences/4414",
+      "https://www.locally-travel.com/experiences/4424",
+      "https://www.locally-travel.com/experiences/4523",
+      "https://www.locally-travel.com/experiences/4597",
+      "https://www.locally-travel.com/experiences/4659",
+      "https://www.locally-travel.com/experiences/4660",
+      "https://www.locally-travel.com/experiences/4811",
+      "https://www.locally-travel.com/experiences/4837",
+      "https://www.locally-travel.com/experiences/4838",
+      "https://www.locally-travel.com/help",
+      "https://www.locally-travel.com/privacy",
+      "https://www.locally-travel.com/proxy-bookings/new",
+      "https://www.locally-travel.com/search",
+      "https://www.locally-travel.com/services/intro",
+      "https://www.locally-travel.com/site-map",
+      "https://www.locally-travel.com/users/0288da66-8322-447c-bf80-bff314ee7299",
+      "https://www.locally-travel.com/users/06672b87-3a70-40c9-88e9-d382ee393b6b",
+      "https://www.locally-travel.com/users/0e354d06-e358-4e2f-bea9-9e42000e6576",
+      "https://www.locally-travel.com/users/103f7324-6872-42f6-b68c-8a4b40149860",
+      "https://www.locally-travel.com/users/12d2d745-c10a-4a64-bdd4-74fa7bd4bb3c",
+      "https://www.locally-travel.com/users/13e40e69-dc61-4d26-a622-22011b92f56c",
+      "https://www.locally-travel.com/users/20b6df41-3959-4734-99b2-eb8ea7e1754e",
+      "https://www.locally-travel.com/users/20efc3cd-e6c1-4685-995c-38d5e5783a7f",
+      "https://www.locally-travel.com/users/36e0e791-e6c3-48f1-b1df-c95fcbee56bc",
+      "https://www.locally-travel.com/users/37bdc2d2-0055-4386-ab33-b6e53e70da86",
+      "https://www.locally-travel.com/users/3a97921b-5518-4f2d-bd8e-ae0ec05cf043",
+      "https://www.locally-travel.com/users/3fcbedfc-7158-469b-b3ac-5fdfa3ca5ab5",
+      "https://www.locally-travel.com/users/41a07240-d32c-43d5-9a33-a81f322b7dc4",
+      "https://www.locally-travel.com/users/444f8d27-4e49-4a0e-acc8-ef9c870843ce",
+      "https://www.locally-travel.com/users/44dffee4-5499-4b94-973e-b3203e2958f3",
+      "https://www.locally-travel.com/users/51deda17-04e2-4682-992f-0c425820bfcb",
+      "https://www.locally-travel.com/users/53c32423-ee43-4556-8613-633e9014a4f9",
+      "https://www.locally-travel.com/users/58ea9193-153d-4ac1-a3b2-95db65efffdc",
+      "https://www.locally-travel.com/users/5940073f-c054-4de6-82af-33fd9c8ef9d9",
+      "https://www.locally-travel.com/users/5bef336f-1b6c-4de9-bb73-08811196e71a",
+      "https://www.locally-travel.com/users/5d37d51c-38de-42d2-9546-fdeae9d9f56f",
+      "https://www.locally-travel.com/users/5da4d3fd-bb0e-41aa-843c-7f7fa5edc74b",
+      "https://www.locally-travel.com/users/6851a5b0-9ef4-4c87-af67-de7976beb5b7",
+      "https://www.locally-travel.com/users/6b8ff92d-31a0-422b-9d85-dd1042d5ff41",
+      "https://www.locally-travel.com/users/710b1c5e-d9fa-42c0-bd19-e7cd8ec30de0",
+      "https://www.locally-travel.com/users/718f0b2b-3cba-42ab-a1a0-50e92e39d322",
+      "https://www.locally-travel.com/users/81396109-1a80-43be-9df5-925b5dc7bcb6",
+      "https://www.locally-travel.com/users/86a2ec04-943a-49ce-aca5-fbee2e0fac52",
+      "https://www.locally-travel.com/users/89aa4dba-4cc1-43a1-b15a-79a4de42822b",
+      "https://www.locally-travel.com/users/92e78ae8-34af-44ea-a89b-a8c54fbb97f3",
+      "https://www.locally-travel.com/users/947bf4cd-6a52-4323-8466-154541362ff0",
+      "https://www.locally-travel.com/users/aa54a660-6b38-47c5-bac3-d79f3aa46064",
+      "https://www.locally-travel.com/users/ad266a16-344f-4d21-b97e-4393f62639fc",
+      "https://www.locally-travel.com/users/b29cb16e-c9b0-4e22-9b05-e62ad53e155e",
+      "https://www.locally-travel.com/users/b3775de3-81dd-431a-bb49-eca03d312a87",
+      "https://www.locally-travel.com/users/b7a924bf-d62d-43f7-945d-9f0d1a65d7d6",
+      "https://www.locally-travel.com/users/bbb58d75-ab07-4add-ad34-31f54456bf9b",
+      "https://www.locally-travel.com/users/c5722272-64df-469d-b6fd-828932f059a4",
+      "https://www.locally-travel.com/users/c5a178c5-851d-4bed-9c7c-3add13ab96ce",
+      "https://www.locally-travel.com/users/c709ca2f-a6b5-496c-8021-53ccabd560d7",
+      "https://www.locally-travel.com/users/c854cd06-e372-457b-8418-65addd896bec",
+      "https://www.locally-travel.com/users/c8c6aadc-82ce-4de2-a755-57e0796e1d32",
+      "https://www.locally-travel.com/users/c95498f8-aa1f-4d50-8a04-d53b484c0287",
+      "https://www.locally-travel.com/users/cd07845e-dab2-4515-ad04-e2d478ff5bec",
+      "https://www.locally-travel.com/users/cf9c080e-2976-47c6-a8f1-d8a9492f692e",
+      "https://www.locally-travel.com/users/d4bbf3d3-302d-4634-9318-3a132ef88658",
+      "https://www.locally-travel.com/users/d52cf65d-db72-4496-8c79-8cc716c76304",
+      "https://www.locally-travel.com/users/d7c23b13-6395-4ab7-a013-85171edaee84",
+      "https://www.locally-travel.com/users/d7e51bc8-91d4-4643-9e0f-849e1f50a8ae",
+      "https://www.locally-travel.com/users/dcd1718d-9278-46b4-bd10-5413e024e391",
+      "https://www.locally-travel.com/users/dcdc9ef0-4e36-4c13-a739-503a40f6c891",
+      "https://www.locally-travel.com/users/e40ea388-a493-421c-8396-9033ba48c6c1",
+      "https://www.locally-travel.com/users/e4cedc01-14b8-44d3-a97d-a1648de0f9b5",
+      "https://www.locally-travel.com/users/e5cf2e2e-33fd-481a-b8df-b06d240d2889",
+      "https://www.locally-travel.com/users/f10179e2-567a-416e-956a-67e194ced1ff",
+      "https://www.locally-travel.com/users/fa1ee984-60f2-4b2e-bc5a-731e0d854d0d",
+      "https://www.locally-travel.com/users/fa3c5386-a836-451a-94be-e65eda34a013",
+      "https://www.locally-travel.com/users/fd184c93-a582-43c1-90d7-0d497d2347da"
+    ],
+    "eligibleCommunity": [
+      {
+        "id": "c17ce39a-2dfc-496d-95fb-c9bd2a8cfdf1"
+      },
+      {
+        "id": "abbff5d6-4f6b-4ffa-b5e0-8e6d0815f242"
+      }
+    ],
+    "counts": {
+      "total": 108,
+      "static": 15,
+      "experience": 33,
+      "community": 2,
+      "host": 58
+    }
+  },
+  "candidateAssets": [
+    {
+      "pathname": "/_next/static/MwDm_Pz5FzX4RTuMN-2CK/_buildManifest.js",
+      "sha256": "022dd7540cb37504510954c6cb5e7e591a9c5a6b1be8b2f26cd077772c4b58e6",
+      "bytes": 696
+    },
+    {
+      "pathname": "/_next/static/MwDm_Pz5FzX4RTuMN-2CK/_clientMiddlewareManifest.js",
+      "sha256": "a6b6e767c21ece37257eb13f0848bf18b3015da1b939fb413ae440267cb4f717",
+      "bytes": 334
+    },
+    {
+      "pathname": "/_next/static/MwDm_Pz5FzX4RTuMN-2CK/_ssgManifest.js",
+      "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00",
+      "bytes": 80
+    },
+    {
+      "pathname": "/_next/static/chunks/0-kd12g3oku-n.js",
+      "sha256": "1df9bb0fe42a19704fb066f778ff0f9a939a6fb04815cdd6afe380514eae7769",
+      "bytes": 38665
+    },
+    {
+      "pathname": "/_next/static/chunks/034tqfb376vn4.js",
+      "sha256": "d790949455bcba47ae9cacd35b9f0a273ac0ea7340ea9f813b4a26b8b6087d6f",
+      "bytes": 29188
+    },
+    {
+      "pathname": "/_next/static/chunks/03eo5ys7zphyf.js",
+      "sha256": "119f2a0cc23c295931e18ac6de5f187a3aa75b3a950896dfb93f631cd82c7c2a",
+      "bytes": 47221
+    },
+    {
+      "pathname": "/_next/static/chunks/096p8-sflnf2u.js",
+      "sha256": "e974611f302027a230075ac19d96a72f87dac41b5b118770545d47ec59ee2353",
+      "bytes": 36678
+    },
+    {
+      "pathname": "/_next/static/chunks/0_k4t8mrzlbk6.js",
+      "sha256": "5c3b00ea21ca5bbd2e943baccad374c80fbd72d812108d346a9e3328ac3aeae3",
+      "bytes": 78223
+    },
+    {
+      "pathname": "/_next/static/chunks/0bpub2cx7d1_-.js",
+      "sha256": "b21de78373439914298120e7216f01b11c3dfd88e8669f18bf64fd46ebb74a6a",
+      "bytes": 59753
+    },
+    {
+      "pathname": "/_next/static/chunks/0cz1d0mv5g_q7.js",
+      "sha256": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+      "bytes": 112594
+    },
+    {
+      "pathname": "/_next/static/chunks/0iou-pzhyv0pc.js",
+      "sha256": "7d347ccf828763db931996b5ebc3e6b3ea854855e42dafdc45683110644fa08c",
+      "bytes": 31686
+    },
+    {
+      "pathname": "/_next/static/chunks/0l0-9chwydjl4.js",
+      "sha256": "2041fe2814182c96fe6702ba30765d502f2a9623d7fe0eb615c46d927fe93c8a",
+      "bytes": 28723
+    },
+    {
+      "pathname": "/_next/static/chunks/0mgqioqd-oyvt.js",
+      "sha256": "74fb12fe152216ac9b8f4282bc4ddb7bee7a87dc0eb9d0c1f84ee5132c57cf6f",
+      "bytes": 21026
+    },
+    {
+      "pathname": "/_next/static/chunks/0n6tj3u6l7_dv.js",
+      "sha256": "b83113ca2b77e98db2df247521df7796b3c545eedb685b3a40810ab90a3d5a28",
+      "bytes": 195332
+    },
+    {
+      "pathname": "/_next/static/chunks/0rmabpk98_26t.js",
+      "sha256": "421db89aa1c85e39408717ae51686b092e99435e221da90e5586e644cdde6150",
+      "bytes": 170941
+    },
+    {
+      "pathname": "/_next/static/chunks/0wgi-_in6921t.js",
+      "sha256": "88eeed655b50c535fd0dd0588794368b5ed826f713e6ec45df3da5db4bdc4707",
+      "bytes": 19277
+    },
+    {
+      "pathname": "/_next/static/chunks/0y_zfy6rrng1r.js",
+      "sha256": "b7749f84fce51477ac6730e7e2ed91218c912f4cc67d476fd1a4ca01b584db70",
+      "bytes": 169489
+    },
+    {
+      "pathname": "/_next/static/chunks/0ybxhep6n19r1.js",
+      "sha256": "0ee33f66e092d1163b49ea137af0a9a30bef99bd6adeeb1a141f4bef96a73fdf",
+      "bytes": 217
+    },
+    {
+      "pathname": "/_next/static/chunks/0yvdkkp0f0tw9.js",
+      "sha256": "07ade4903ff3ae3ed0acf16a78a8f7c49835b2b713a1ce55efe9f666e4216b4e",
+      "bytes": 325
+    },
+    {
+      "pathname": "/_next/static/chunks/0zefafd357_fo.css",
+      "sha256": "1eb00f3d88b46057d38ad4724e6f0ca8fb3f31d3875dfbbc56d2bc8a878b40dd",
+      "bytes": 8949
+    },
+    {
+      "pathname": "/_next/static/chunks/1-t4mqfpwthe0.js",
+      "sha256": "208dc1d95ae3f146ccf7e6de7a229accdeabef9dc7ac5c1e633db55a1022d53d",
+      "bytes": 64078
+    },
+    {
+      "pathname": "/_next/static/chunks/10sxhneig8kh0.js",
+      "sha256": "d6414629179bcf5ac906890945e2f8f9ac55613d86ea1fbec2ccfde7b3064cdf",
+      "bytes": 32327
+    },
+    {
+      "pathname": "/_next/static/chunks/124cfsr46b3yk.js",
+      "sha256": "40dca722d3f2bab2f5e796e344e437f8c7be0eb8bfa3d469d214febfdff6d238",
+      "bytes": 149482
+    },
+    {
+      "pathname": "/_next/static/chunks/14qozu-sxyr9e.js",
+      "sha256": "837a1d0bf5d90a296711a9d11a3219968375843fecf1655b31af6e6418ce2756",
+      "bytes": 43257
+    },
+    {
+      "pathname": "/_next/static/chunks/14s871j6g_-rd.js",
+      "sha256": "c870a383b19093ca873be439e05769f3038a664dcb00a2c0596e7a9b0cd0afda",
+      "bytes": 35168
+    },
+    {
+      "pathname": "/_next/static/chunks/15qk3gby6w6n0.js",
+      "sha256": "20bec896b74394aca976f4f5d3aa790cd3bcf04b2175e940380c1031c631cde2",
+      "bytes": 29410
+    },
+    {
+      "pathname": "/_next/static/chunks/16f2xvjuag5gg.js",
+      "sha256": "7a36603134b10b68ab113e31f05d84862d8db3c0d6fd6dd17c3660f7b6bde245",
+      "bytes": 63762
+    },
+    {
+      "pathname": "/_next/static/chunks/18tm51oydq_oj.js",
+      "sha256": "e636a50dc074e0112cfafe86e7ce604dd4fdba8e5420d76f478b0b6d51de7a52",
+      "bytes": 32147
+    },
+    {
+      "pathname": "/_next/static/chunks/1_ae6277n2o77.js",
+      "sha256": "b7282627805affa27398357693f20dbcb298ad3c0d3cd6f68f0b3ca1efb9a099",
+      "bytes": 34163
+    },
+    {
+      "pathname": "/_next/static/chunks/1bq9wymqtjfkp.js",
+      "sha256": "03de6280c6ebba36db2e5f06fe3972a64615d0f2481d61ec9a8ce34866025d69",
+      "bytes": 36521
+    },
+    {
+      "pathname": "/_next/static/chunks/1ce0shjcij90e.js",
+      "sha256": "0ac794febbba962ed95c8eca1f112fc111aba8593bc2a0943a13529e9c06d07b",
+      "bytes": 668269
+    },
+    {
+      "pathname": "/_next/static/chunks/1hj6fx75o64ci.js",
+      "sha256": "635d53dd82ece4ccdc255bdda9d94cbb8cbfa746d1f2bc05edfaaa33b4cd2662",
+      "bytes": 376587
+    },
+    {
+      "pathname": "/_next/static/chunks/1k0j_y393l8ej.js",
+      "sha256": "bbecb931f18d03565432099ec36696e6d908283f80d752cdbf23dd028c303d85",
+      "bytes": 15672
+    },
+    {
+      "pathname": "/_next/static/chunks/1l4fu558woa8-.js",
+      "sha256": "451a8cd8572b6ac2c01a8a692b8d7c09a669d34873dcd3d6bd0ddc2e9afe9e71",
+      "bytes": 21871
+    },
+    {
+      "pathname": "/_next/static/chunks/1m_q4_7b6zj9b.js",
+      "sha256": "a08e7b103f7c705490f1e7c670afec19185c7e517434789b1e6e79cec395b5f1",
+      "bytes": 155748
+    },
+    {
+      "pathname": "/_next/static/chunks/1n294f8np8e_p.js",
+      "sha256": "2894348f02b94ea45c300b086ff3080907eb43d66ec74260883552009fc3d646",
+      "bytes": 26653
+    },
+    {
+      "pathname": "/_next/static/chunks/1nsp44f53hi5s.js",
+      "sha256": "5eed2ff5495d48835933f3ec88b132c4618e99395055a10a073c1444f0fa7b3c",
+      "bytes": 1024
+    },
+    {
+      "pathname": "/_next/static/chunks/1qk9-o3ty7t06.js",
+      "sha256": "c3a2772d398722b84197cc8143302283c0ea3b2ed7290ab0bc4d771327d60c26",
+      "bytes": 4727
+    },
+    {
+      "pathname": "/_next/static/chunks/1qqcos22_tj-b.js",
+      "sha256": "90d80ab1995b9abad0d516f447ccc83d303404748f74ec138cad6860a979d4f9",
+      "bytes": 423875
+    },
+    {
+      "pathname": "/_next/static/chunks/1r10qdu30s-97.css",
+      "sha256": "670fa09851ac3cfd41c63759c0860f2c94294377c7920ab46dba70bbbfd61adc",
+      "bytes": 2120
+    },
+    {
+      "pathname": "/_next/static/chunks/1tfzn70giiz55.js",
+      "sha256": "a03591905b41d53ec1f105c35a5d8f1330868c117dd616831a7f4ac4d6ffdbac",
+      "bytes": 24137
+    },
+    {
+      "pathname": "/_next/static/chunks/1thxsz1t9_r6-.js",
+      "sha256": "c4f00e25eaf22fcf7cd205beaa46a81741096fdd0a849afb39b040774358b24e",
+      "bytes": 3990
+    },
+    {
+      "pathname": "/_next/static/chunks/1tnqn0e31j9-1.js",
+      "sha256": "6fcdb58e277f1990d6c0b1d5e1ef52fedcea47ee2c590ac849cd143b16040124",
+      "bytes": 51388
+    },
+    {
+      "pathname": "/_next/static/chunks/1uvzv7elpsmug.js",
+      "sha256": "13723e0c152c57dcda90ab87862446799205757bebd67c471955bc4343c55f0f",
+      "bytes": 40582
+    },
+    {
+      "pathname": "/_next/static/chunks/1w2369e_ejexl.js",
+      "sha256": "9db1f45fd4ca857969ca6f876d6195a0d5393740d0b9596453c4b25c9a1350e5",
+      "bytes": 27768
+    },
+    {
+      "pathname": "/_next/static/chunks/1wbyo6ktspe47.js",
+      "sha256": "ca7b6ec93f67489fe9988a5e4dd82c2ff7035dfd2d018603ebabb508adafba7c",
+      "bytes": 5070
+    },
+    {
+      "pathname": "/_next/static/chunks/1zsj768_aoxap.js",
+      "sha256": "6dba4394be3ccfe1afadcda8152adc209fa2c47e56a370084822d98f1c432c5e",
+      "bytes": 58027
+    },
+    {
+      "pathname": "/_next/static/chunks/210edz8c601rk.js",
+      "sha256": "e323408081a0ce1e778fa0a1394e068162fa5fb5a4036580df55455ede1dc0eb",
+      "bytes": 45738
+    },
+    {
+      "pathname": "/_next/static/chunks/23yw4zxovp_e6.js",
+      "sha256": "78e0290c2badaacccff6b1018df41279e377ad34e22696e3334906534438c079",
+      "bytes": 37914
+    },
+    {
+      "pathname": "/_next/static/chunks/26g4tn5b226u5.js",
+      "sha256": "9882888c4c654545dc12df98ecd755a711563ca428114ed7ca9d686e4e58ce00",
+      "bytes": 31996
+    },
+    {
+      "pathname": "/_next/static/chunks/28526qxwr8_gg.js",
+      "sha256": "18f99da4cebe2161bd73f24d5a6812ce12def2907b0f6e1e1b340fe6f8c1e7a3",
+      "bytes": 14995
+    },
+    {
+      "pathname": "/_next/static/chunks/2939r0t4rhqmr.js",
+      "sha256": "5864e5f406daa647785b7626574d76062213ab29830f36b489a37c542f80a905",
+      "bytes": 4646
+    },
+    {
+      "pathname": "/_next/static/chunks/2dn1c14e9m0b1.js",
+      "sha256": "841c44199f7579367c465cff4349cb6090fa2282ae4d53e1debaf48f499cf2ea",
+      "bytes": 46118
+    },
+    {
+      "pathname": "/_next/static/chunks/2e3i44exrvcvv.js",
+      "sha256": "20b66e85ee43f4e6fddb97e8b858d6b1811514b563ed594ad424276ab875ad31",
+      "bytes": 35538
+    },
+    {
+      "pathname": "/_next/static/chunks/2fpc6b5c2ec1e.js",
+      "sha256": "2008e0f41772098690f30ef29f0b91788032e2a227ed1a708b76910cb7340373",
+      "bytes": 32609
+    },
+    {
+      "pathname": "/_next/static/chunks/2gv6zgf6w4nlz.js",
+      "sha256": "5bdeb71e7ce0af5cede2425186ef56cae658c154504767ce2e7430d664f9874e",
+      "bytes": 54358
+    },
+    {
+      "pathname": "/_next/static/chunks/2hgww825iveuj.js",
+      "sha256": "8abad8430270aa1bb2e62da2d07f3fc0ca1ee9c5cd0da01e7ec55f657138c5bc",
+      "bytes": 45173
+    },
+    {
+      "pathname": "/_next/static/chunks/2i0fjfqjli8l4.js",
+      "sha256": "b58f8c021cd178c48ecb6cbe43848c2c1b346bb3e1c726d68d3d14ed5803a8ce",
+      "bytes": 325
+    },
+    {
+      "pathname": "/_next/static/chunks/2ix_r_l-xrg_o.js",
+      "sha256": "9ab9f26df7fd0e04dd9fc6dc9ad57b7d8459d88fe8844c4a8e44313599b829d8",
+      "bytes": 26786
+    },
+    {
+      "pathname": "/_next/static/chunks/2ld0_8es649xq.js",
+      "sha256": "24f3a73e2a709a6ce148172fb443aa03e748c92c5b5a870d79d275939285a076",
+      "bytes": 13252
+    },
+    {
+      "pathname": "/_next/static/chunks/2mq0-pkuv5lr7.js",
+      "sha256": "4004fc63c5884766aa1fc210688c9d006537a3545ae385aca4ad0b54899bd024",
+      "bytes": 28872
+    },
+    {
+      "pathname": "/_next/static/chunks/2oo5h8yeq82oh.js",
+      "sha256": "a9dd09eecf74c0b677224e08dcc6d6620cc3a139327eb3440bce1c1e42ae6da6",
+      "bytes": 201368
+    },
+    {
+      "pathname": "/_next/static/chunks/2outjhi_qrcc2.js",
+      "sha256": "0d21e8848b2301e1ab40e8cc1dcc8e07af4cf87db68bf64efe1bf77dce9c38c1",
+      "bytes": 68330
+    },
+    {
+      "pathname": "/_next/static/chunks/2ozv3uff8pozh.css",
+      "sha256": "7839338648c0429fb3156ce2bf8ea12fa75e9acf3f8605542e1124dbbe77e8ee",
+      "bytes": 229363
+    },
+    {
+      "pathname": "/_next/static/chunks/2p9fjhyy-6jnh.js",
+      "sha256": "2e06d469e1ca0dfda6bdd8c71ff9e7e22eb28d0bf7784a6dbf5e7ef509b489cd",
+      "bytes": 35344
+    },
+    {
+      "pathname": "/_next/static/chunks/2pu8m_h9s1and.js",
+      "sha256": "497d2346231af05d25ebce47c9671ac8c8e7337c9b956bf028b1d5f0cbf92503",
+      "bytes": 10184
+    },
+    {
+      "pathname": "/_next/static/chunks/2putr4vupila1.js",
+      "sha256": "24b95015dd29e1d0a0de81a46547c0f6b2f5e7e9d673402d8035000dbad26c93",
+      "bytes": 23259
+    },
+    {
+      "pathname": "/_next/static/chunks/2wdspmjiob5lw.js",
+      "sha256": "9b45dda295bdb6dfa207dd87a79fc97f5ebd1f67ea422d5bc34d8513fd9c610b",
+      "bytes": 19399
+    },
+    {
+      "pathname": "/_next/static/chunks/2we7tl3zh09mv.js",
+      "sha256": "1f4b580ec02826478c80b2162fa7cf3bd9efc0931e22e5d4d2b5394309ba7c3c",
+      "bytes": 24910
+    },
+    {
+      "pathname": "/_next/static/chunks/2yl9xg7sc0lg-.js",
+      "sha256": "e484d34929da58cd7df42fcce3ecd374f9b125360e61ff687d7526aced323343",
+      "bytes": 209185
+    },
+    {
+      "pathname": "/_next/static/chunks/2zgdoilkmgal6.js",
+      "sha256": "6a2ef7799b6395011c86cfdfc4b6a49a6b5e4ff674d7b0cdac56b944daf236d9",
+      "bytes": 12613
+    },
+    {
+      "pathname": "/_next/static/chunks/2zn7l41mc3z6b.js",
+      "sha256": "a51360fc4a2026a1a92299cc9c3d6484c79b89e73a82aec4c9d71755a713a0f3",
+      "bytes": 328708
+    },
+    {
+      "pathname": "/_next/static/chunks/31hk15pdbn_zh.js",
+      "sha256": "4e653dc191b063c5286c3bff37c371f70ec69b14fb8b29148b0ceb392efc8916",
+      "bytes": 56779
+    },
+    {
+      "pathname": "/_next/static/chunks/33dgf92m5ukgv.js",
+      "sha256": "ee71313b264de149b6e8215272abfff4f955e1711664366374a19d6316ce7d92",
+      "bytes": 55155
+    },
+    {
+      "pathname": "/_next/static/chunks/34b6z9gssfijn.js",
+      "sha256": "4dde833cfaf8cce00ea09ef077465d9cb2cee73f2dde5c779be0ca5a8f874d22",
+      "bytes": 68349
+    },
+    {
+      "pathname": "/_next/static/chunks/35jlt1r6tvfrl.js",
+      "sha256": "bb7a043ca603031f86ab017242cdb9aeed16055461d87ea665a75da44da22ba9",
+      "bytes": 32939
+    },
+    {
+      "pathname": "/_next/static/chunks/35o-_ythim4zv.js",
+      "sha256": "6126ced739c09a9c85966939b4ae57bd720b82210c48141e0629efc9b1e13d78",
+      "bytes": 26572
+    },
+    {
+      "pathname": "/_next/static/chunks/39helunfoxlob.js",
+      "sha256": "405bfc4d6f478a5c40f507c82b825d5ca2b94b33f7dc4924f2048b2a7af363c4",
+      "bytes": 1364
+    },
+    {
+      "pathname": "/_next/static/chunks/3_jh-1l00jt77.js",
+      "sha256": "e506dedaf3d556a7ea2859497da47169428b4123ee2d88d69cd96bb4d47ecd6c",
+      "bytes": 63163
+    },
+    {
+      "pathname": "/_next/static/chunks/3_m2geb44noxu.js",
+      "sha256": "5648176e5a34612582e66631d7b2a2126e0aed9d2f1393c428c2dfa201c18b15",
+      "bytes": 44368
+    },
+    {
+      "pathname": "/_next/static/chunks/3bnodpi1as_32.js",
+      "sha256": "a2dcaa8846261d814b6e2c702c852004cf970e5e4c48590247f2f54d8698b2e8",
+      "bytes": 151
+    },
+    {
+      "pathname": "/_next/static/chunks/3bxkzvrcjzdny.js",
+      "sha256": "63f5f23104b850b29b0395813f33fa1e53cac23521a449d5ec550f0f6fcbdf8a",
+      "bytes": 52854
+    },
+    {
+      "pathname": "/_next/static/chunks/3d5cmj6_ttrnc.js",
+      "sha256": "04e268f13b4e7e3457d3b6cadfbc97570e5167fc342c850b541205d64bd1480d",
+      "bytes": 217
+    },
+    {
+      "pathname": "/_next/static/chunks/3de68vrp22bw0.js",
+      "sha256": "3c7c8bda20bbc4a82b3fcc0743dd73f899dbddaf5f15e2b4931d7927bc52fcc9",
+      "bytes": 49011
+    },
+    {
+      "pathname": "/_next/static/chunks/3eq07ofrs1oq9.js",
+      "sha256": "a892f70ed8b8ecced78109f308a6fc162fab045e9936a59410bf3945197e8b63",
+      "bytes": 13966
+    },
+    {
+      "pathname": "/_next/static/chunks/3et08lkw55i31.js",
+      "sha256": "f87a50ba8d5c23efbe7aff29abc07541c43498ffe2526f1252fb8c796164d0d1",
+      "bytes": 29608
+    },
+    {
+      "pathname": "/_next/static/chunks/3fcojd6s2uo3s.js",
+      "sha256": "bd2cc4e3c3b59feff3a78bfd7e0265e9701a303ce5a8ffae0ae9aa2f4054373c",
+      "bytes": 130512
+    },
+    {
+      "pathname": "/_next/static/chunks/3g024dk1p5e-f.js",
+      "sha256": "33ee4f8e53615e4d96dfce38273240ce9598a02d88dfa10a5b3c28ad256cce24",
+      "bytes": 33889
+    },
+    {
+      "pathname": "/_next/static/chunks/3jcgpixm3wgps.js",
+      "sha256": "01289f3a48f7041a2aad2c7146ba3148261b49b8ee9485478537081bd240e993",
+      "bytes": 19159
+    },
+    {
+      "pathname": "/_next/static/chunks/3jx5tx-v4jp41.js",
+      "sha256": "ef77f985e2a4234b16176016b2fcdc374b2e84c9f9953edd8b0758d34de33695",
+      "bytes": 73994
+    },
+    {
+      "pathname": "/_next/static/chunks/3lua85n9mdc26.js",
+      "sha256": "38d88796e86f4621e3f581b3c93dd67de4b4629faf052c65ace83d19f2ed2098",
+      "bytes": 25626
+    },
+    {
+      "pathname": "/_next/static/chunks/3nkvb8nxemj1p.js",
+      "sha256": "2a4b4bf3e112bd33b6a40ad00918efa755e6cc1f4d43cf19fff19f272183421e",
+      "bytes": 39674
+    },
+    {
+      "pathname": "/_next/static/chunks/3pa82n-mfl0us.js",
+      "sha256": "20c786dbb9e2ff80befd4921e66ee1e2c2bdc5578eaaabf0c840f284d63b3968",
+      "bytes": 1837
+    },
+    {
+      "pathname": "/_next/static/chunks/3z4n5jz-bbm2n.js",
+      "sha256": "0195ba8ff421cad1a6646db01fa278b1fff8a590d87739c0bb80f07e22e28102",
+      "bytes": 25364
+    },
+    {
+      "pathname": "/_next/static/chunks/404a-h2mn85mk.js",
+      "sha256": "895b7a9abc387545d3db105822ed864ab5d34c4e908f0b2daa3234ddf11e6b02",
+      "bytes": 27866
+    },
+    {
+      "pathname": "/_next/static/chunks/40o_44ee39-76.js",
+      "sha256": "c51da6e8fc96f075042ecc275c3cb98c9e2e833875075252c48e755e191ac65c",
+      "bytes": 35809
+    },
+    {
+      "pathname": "/_next/static/chunks/turbopack-3_tdoupjwvps7.js",
+      "sha256": "ddd1d56d3ad1686e4af41b03e8505943f703dc71b32793d9bab9eab2ef7cdbbe",
+      "bytes": 10980
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Bold-s.1s-g3_fmlasxx.woff2",
+      "sha256": "c53de7a25bf819453f8f543f9ac2be0551db5208d5fddf313f6e7a4cca560f7c",
+      "bytes": 542272
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Light-s.1nscgyiirx2bc.woff2",
+      "sha256": "d1278c92a312f78c0faa33063fa74a5c5168448314b016f3cd149e0a35f3c3f6",
+      "bytes": 557208
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Medium-s.1nrq08c9z4iip.woff2",
+      "sha256": "d459cf30eed7dcc961e6a6126f9eee2e9a4ce50cc451dc8f5a971d431e6aa665",
+      "bytes": 604488
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Regular-s.1rdopydqqqbwv.woff2",
+      "sha256": "746889b37c984ee4ce505faeb0a44b68c0b2235a77089ad63a42f86fb1de0d13",
+      "bytes": 560588
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_SemiBold-s.2vcmccyvf8tq_.woff2",
+      "sha256": "b01ab2c1104899029c258d1b1cf546ea430b28dbcc7de708ad4ffb35939c1e92",
+      "bytes": 604552
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Bold-s.p.153t1vvyuruku.woff2",
+      "sha256": "0a037bd9349feffdf37c30d3f07e073c4c29783149b82bc704bb902e1be9434e",
+      "bytes": 119592
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Medium-s.p.3lo2f_mb3p0o6.woff2",
+      "sha256": "e11dad968e6e1afcbdd894c329288ab0d91b79f652fdfdc29a576e037c1d7a20",
+      "bytes": 118308
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Regular-s.p.2l5j3en5e2juu.woff2",
+      "sha256": "af296a7052942dc6d20fc9e528f0a0b60fd78606e818a50d3a6f8fb9b02aeb18",
+      "bytes": 116284
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_SemiBold-s.p.00zwaddkg0npx.woff2",
+      "sha256": "f820695670417c6ad4eba2860d4d6b76ab4d5fa656042a2ca474b4fd6145eb7e",
+      "bytes": 118956
+    },
+    {
+      "pathname": "/_next/static/media/icon.41826ce6dw9iy.png",
+      "sha256": "64b3e11e02bba033b698f89e3e5ce39748787b4015ca0e9f5042e1984ef577b1",
+      "bytes": 22234
+    }
+  ],
+  "baselineAssets": [
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Bold-s.p.153t1vvyuruku.woff2",
+      "sha256": "0a037bd9349feffdf37c30d3f07e073c4c29783149b82bc704bb902e1be9434e",
+      "bytes": 119592
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Regular-s.p.2l5j3en5e2juu.woff2",
+      "sha256": "af296a7052942dc6d20fc9e528f0a0b60fd78606e818a50d3a6f8fb9b02aeb18",
+      "bytes": 116284
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_Medium-s.p.3lo2f_mb3p0o6.woff2",
+      "sha256": "e11dad968e6e1afcbdd894c329288ab0d91b79f652fdfdc29a576e037c1d7a20",
+      "bytes": 118308
+    },
+    {
+      "pathname": "/_next/static/chunks/1r10qdu30s-97.css",
+      "sha256": "670fa09851ac3cfd41c63759c0860f2c94294377c7920ab46dba70bbbfd61adc",
+      "bytes": 2120
+    },
+    {
+      "pathname": "/_next/static/chunks/0wgi-_in6921t.js",
+      "sha256": "88eeed655b50c535fd0dd0588794368b5ed826f713e6ec45df3da5db4bdc4707",
+      "bytes": 19277
+    },
+    {
+      "pathname": "/_next/static/chunks/2ozv3uff8pozh.css",
+      "sha256": "7839338648c0429fb3156ce2bf8ea12fa75e9acf3f8605542e1124dbbe77e8ee",
+      "bytes": 229363
+    },
+    {
+      "pathname": "/_next/static/chunks/26g4tn5b226u5.js",
+      "sha256": "9882888c4c654545dc12df98ecd755a711563ca428114ed7ca9d686e4e58ce00",
+      "bytes": 31996
+    },
+    {
+      "pathname": "/_next/static/chunks/33dgf92m5ukgv.js",
+      "sha256": "ee71313b264de149b6e8215272abfff4f955e1711664366374a19d6316ce7d92",
+      "bytes": 55155
+    },
+    {
+      "pathname": "/_next/static/chunks/1m_q4_7b6zj9b.js",
+      "sha256": "a08e7b103f7c705490f1e7c670afec19185c7e517434789b1e6e79cec395b5f1",
+      "bytes": 155748
+    },
+    {
+      "pathname": "/_next/static/media/Inter_18pt_SemiBold-s.p.00zwaddkg0npx.woff2",
+      "sha256": "f820695670417c6ad4eba2860d4d6b76ab4d5fa656042a2ca474b4fd6145eb7e",
+      "bytes": 118956
+    },
+    {
+      "pathname": "/_next/static/chunks/turbopack-3_tdoupjwvps7.js",
+      "sha256": "ddd1d56d3ad1686e4af41b03e8505943f703dc71b32793d9bab9eab2ef7cdbbe",
+      "bytes": 10980
+    },
+    {
+      "pathname": "/_next/static/chunks/3eq07ofrs1oq9.js",
+      "sha256": "a892f70ed8b8ecced78109f308a6fc162fab045e9936a59410bf3945197e8b63",
+      "bytes": 13966
+    },
+    {
+      "pathname": "/_next/static/chunks/1qqcos22_tj-b.js",
+      "sha256": "90d80ab1995b9abad0d516f447ccc83d303404748f74ec138cad6860a979d4f9",
+      "bytes": 423875
+    },
+    {
+      "pathname": "/_next/static/chunks/2mq0-pkuv5lr7.js",
+      "sha256": "4004fc63c5884766aa1fc210688c9d006537a3545ae385aca4ad0b54899bd024",
+      "bytes": 28872
+    },
+    {
+      "pathname": "/_next/static/chunks/2oo5h8yeq82oh.js",
+      "sha256": "a9dd09eecf74c0b677224e08dcc6d6620cc3a139327eb3440bce1c1e42ae6da6",
+      "bytes": 201368
+    },
+    {
+      "pathname": "/_next/static/chunks/1hj6fx75o64ci.js",
+      "sha256": "635d53dd82ece4ccdc255bdda9d94cbb8cbfa746d1f2bc05edfaaa33b4cd2662",
+      "bytes": 376587
+    },
+    {
+      "pathname": "/_next/static/chunks/0n6tj3u6l7_dv.js",
+      "sha256": "b83113ca2b77e98db2df247521df7796b3c545eedb685b3a40810ab90a3d5a28",
+      "bytes": 195332
+    },
+    {
+      "pathname": "/_next/static/chunks/210edz8c601rk.js",
+      "sha256": "e323408081a0ce1e778fa0a1394e068162fa5fb5a4036580df55455ede1dc0eb",
+      "bytes": 45738
+    },
+    {
+      "pathname": "/_next/static/chunks/0rmabpk98_26t.js",
+      "sha256": "421db89aa1c85e39408717ae51686b092e99435e221da90e5586e644cdde6150",
+      "bytes": 170941
+    },
+    {
+      "pathname": "/_next/static/chunks/39helunfoxlob.js",
+      "sha256": "405bfc4d6f478a5c40f507c82b825d5ca2b94b33f7dc4924f2048b2a7af363c4",
+      "bytes": 1364
+    },
+    {
+      "pathname": "/_next/static/chunks/0ybxhep6n19r1.js",
+      "sha256": "0ee33f66e092d1163b49ea137af0a9a30bef99bd6adeeb1a141f4bef96a73fdf",
+      "bytes": 217
+    },
+    {
+      "pathname": "/_next/static/chunks/3pa82n-mfl0us.js",
+      "sha256": "20c786dbb9e2ff80befd4921e66ee1e2c2bdc5578eaaabf0c840f284d63b3968",
+      "bytes": 1837
+    },
+    {
+      "pathname": "/_next/static/chunks/1_ae6277n2o77.js",
+      "sha256": "b7282627805affa27398357693f20dbcb298ad3c0d3cd6f68f0b3ca1efb9a099",
+      "bytes": 34163
+    },
+    {
+      "pathname": "/_next/static/chunks/0bpub2cx7d1_-.js",
+      "sha256": "b21de78373439914298120e7216f01b11c3dfd88e8669f18bf64fd46ebb74a6a",
+      "bytes": 59753
+    },
+    {
+      "pathname": "/_next/static/chunks/0_k4t8mrzlbk6.js",
+      "sha256": "5c3b00ea21ca5bbd2e943baccad374c80fbd72d812108d346a9e3328ac3aeae3",
+      "bytes": 78223
+    },
+    {
+      "pathname": "/_next/static/chunks/25-m24c9knu8y.js",
+      "sha256": "b93268f0a98abc881e288139e445e1beb0e525b01a8b25b67ee6305c10e8b21e",
+      "bytes": 35306
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Bold-s.1s-g3_fmlasxx.woff2",
+      "sha256": "c53de7a25bf819453f8f543f9ac2be0551db5208d5fddf313f6e7a4cca560f7c",
+      "bytes": 542272
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Light-s.1nscgyiirx2bc.woff2",
+      "sha256": "d1278c92a312f78c0faa33063fa74a5c5168448314b016f3cd149e0a35f3c3f6",
+      "bytes": 557208
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Regular-s.1rdopydqqqbwv.woff2",
+      "sha256": "746889b37c984ee4ce505faeb0a44b68c0b2235a77089ad63a42f86fb1de0d13",
+      "bytes": 560588
+    },
+    {
+      "pathname": "/_next/static/chunks/3bnodpi1as_32.js",
+      "sha256": "a2dcaa8846261d814b6e2c702c852004cf970e5e4c48590247f2f54d8698b2e8",
+      "bytes": 151
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_Medium-s.1nrq08c9z4iip.woff2",
+      "sha256": "d459cf30eed7dcc961e6a6126f9eee2e9a4ce50cc451dc8f5a971d431e6aa665",
+      "bytes": 604488
+    },
+    {
+      "pathname": "/_next/static/chunks/0cz1d0mv5g_q7.js",
+      "sha256": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+      "bytes": 112594
+    },
+    {
+      "pathname": "/_next/static/chunks/096p8-sflnf2u.js",
+      "sha256": "e974611f302027a230075ac19d96a72f87dac41b5b118770545d47ec59ee2353",
+      "bytes": 36678
+    },
+    {
+      "pathname": "/_next/static/chunks/1nsp44f53hi5s.js",
+      "sha256": "5eed2ff5495d48835933f3ec88b132c4618e99395055a10a073c1444f0fa7b3c",
+      "bytes": 1024
+    },
+    {
+      "pathname": "/_next/static/chunks/2939r0t4rhqmr.js",
+      "sha256": "5864e5f406daa647785b7626574d76062213ab29830f36b489a37c542f80a905",
+      "bytes": 4646
+    },
+    {
+      "pathname": "/_next/static/chunks/14qozu-sxyr9e.js",
+      "sha256": "837a1d0bf5d90a296711a9d11a3219968375843fecf1655b31af6e6418ce2756",
+      "bytes": 43257
+    },
+    {
+      "pathname": "/_next/static/chunks/3bxkzvrcjzdny.js",
+      "sha256": "63f5f23104b850b29b0395813f33fa1e53cac23521a449d5ec550f0f6fcbdf8a",
+      "bytes": 52854
+    },
+    {
+      "pathname": "/_next/static/chunks/0y_zfy6rrng1r.js",
+      "sha256": "b7749f84fce51477ac6730e7e2ed91218c912f4cc67d476fd1a4ca01b584db70",
+      "bytes": 169489
+    },
+    {
+      "pathname": "/_next/static/chunks/3m_h_so0zsh98.js",
+      "sha256": "2adc036f1054942d7995cf5890d2d2a35fe37894a6d7f967e98fd72969c06d40",
+      "bytes": 24872
+    },
+    {
+      "pathname": "/_next/static/chunks/1ui28us3uzl2-.js",
+      "sha256": "4e38fb1e3eb8f7d2d533d65eee707ef42604db743238da262fc57a34501eb47b",
+      "bytes": 46080
+    },
+    {
+      "pathname": "/_next/static/media/IBMPlexSansKR_SemiBold-s.2vcmccyvf8tq_.woff2",
+      "sha256": "b01ab2c1104899029c258d1b1cf546ea430b28dbcc7de708ad4ffb35939c1e92",
+      "bytes": 604552
+    },
+    {
+      "pathname": "/_next/static/chunks/03w5lnqf_28ih.js",
+      "sha256": "e19336fd60b58c58a0c65d7ce815fb5e1f7580c2975fc38ceba33b3097708cb9",
+      "bytes": 44330
+    },
+    {
+      "pathname": "/_next/static/chunks/124cfsr46b3yk.js",
+      "sha256": "40dca722d3f2bab2f5e796e344e437f8c7be0eb8bfa3d469d214febfdff6d238",
+      "bytes": 149482
+    },
+    {
+      "pathname": "/_next/static/chunks/2e3i44exrvcvv.js",
+      "sha256": "20b66e85ee43f4e6fddb97e8b858d6b1811514b563ed594ad424276ab875ad31",
+      "bytes": 35538
+    }
+  ],
+  "noProductionCredentials": true,
+  "promotionAuthorized": false
+}

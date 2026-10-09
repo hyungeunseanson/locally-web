@@ -1,0 +1,63 @@
+name: F02 Read-only Release Validation
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/f02-readonly-release-validation.yml'
+      - 'scripts/cloudflare/f02-release-validation-fixture/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/f02-readonly-release-validation.yml'
+      - 'scripts/cloudflare/f02-release-validation-fixture/**'
+permissions:
+  contents: read
+jobs:
+  exact-candidate-readonly:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      F02_GATE_STATUS: ${{ github.event_name == 'push' && 'MERGED_MAIN_READONLY_VALIDATION' || 'DRAFT_VALIDATOR_READONLY_VALIDATION' }}
+    steps:
+      - name: Require native ARM64
+        run: |
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test "$RUNNER_ARCH" = ARM64
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify read-only fixture boundaries
+        run: |
+          npx eslint scripts/cloudflare/f02-release-validation-fixture
+          node --test scripts/cloudflare/f02-release-validation-fixture/prepare.test.mjs scripts/cloudflare/f02-release-validation-fixture/community-view-fixture.test.mjs
+      - name: Acquire exact pinned official Chromium without bypass or fallback
+        run: |
+          mkdir -p "$RUNNER_TEMP/chromium8508456-evidence"
+          node scripts/cloudflare/download-chromium8508456-ci.mjs "$RUNNER_TEMP/chromium8508456-evidence"
+      - name: Materialize public exact-version reference bytes without credentials
+        run: node scripts/cloudflare/f02-release-validation-fixture/prepare.mjs
+      - name: Full exact Candidate Browser Gate on isolated CI network
+        run: node .wrangler/f02-pr212-final-validation/browser.mjs preflight candidate ci-final-preflight
+      - name: Merged-main new independent 35-run epoch, no retries or PASS carry
+        if: github.event_name == 'push'
+        run: python3 .wrangler/f02-pr212-final-validation/epoch.py ci-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Preserve every sanitized receipt, including failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: f02-readonly-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .wrangler/f02-pr212-final-validation/evidence/
+            .wrangler/f02-pr212-final-validation/internal/*.log
+            ${{ runner.temp }}/chromium8508456-evidence/*.json
+          if-no-files-found: error
+          retention-days: 14
