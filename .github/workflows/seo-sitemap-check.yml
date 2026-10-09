@@ -26,6 +26,8 @@ jobs:
           node-version: 24.20.0
           cache: npm
       - run: npm ci
+      - name: Robots search/training separation and native Next HTTP regressions
+        run: node --test tests/unit/robots-policy.test.mjs
       - name: Local PostgreSQL (PGlite) and real SDK sitemap regressions
         run: npm run test:seo:sitemap
       - name: Community legacy/modern policy, privacy and Next HTTP regressions
@@ -33,7 +35,7 @@ jobs:
       - name: Preserve Community UUID guard and existing public detail behavior
         run: npx playwright test -c playwright.contracts.config.ts tests/e2e/community-invalid-uuid-guard.spec.mjs --project=chromium --workers=1 --reporter=line
       - name: Lint sitemap and Community changes
-        run: npx eslint app/sitemap.ts app/utils/sitemapData.ts app/community/indexability.ts app/community/detailData.server.ts app/community/\[id\]/page.tsx tests/integration/sitemap-recovery.test.mjs tests/integration/community-indexability.test.mjs tests/e2e/community-invalid-uuid-guard.spec.mjs
+        run: npx eslint app/robots.ts tests/unit/robots-policy.test.mjs app/sitemap.ts app/utils/sitemapData.ts app/community/indexability.ts app/community/detailData.server.ts app/community/\[id\]/page.tsx tests/integration/sitemap-recovery.test.mjs tests/integration/community-indexability.test.mjs tests/e2e/community-invalid-uuid-guard.spec.mjs
       - name: Build OpenNext without provider access
         run: npm run cloudflare:build:production
       - name: Verify the real sitemap in local workerd with synthetic SQL and R2 only
