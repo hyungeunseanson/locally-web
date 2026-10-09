@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import robotsParser from 'robots-parser';
 
 const require = createRequire(import.meta.url);
 const { resolveRobots } = require('next/dist/build/webpack/loaders/metadata/resolve-route-data.js');
@@ -17,30 +18,52 @@ const source = bundle.outputFiles[0].text;
 const { default: robots } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const data = robots();
 const body = resolveRobots(data);
-const training = ['Amazonbot', 'Applebot-Extended', 'Bytespider', 'CCBot', 'ClaudeBot', 'Google-Extended', 'GPTBot', 'meta-externalagent'];
+const training = ['Amazonbot', 'Applebot-Extended', 'Bytespider', 'CCBot', 'ClaudeBot', 'GPTBot', 'meta-externalagent'];
 const searchAndAgents = ['Googlebot', 'Googlebot-Image', 'Bingbot', 'Applebot', 'OAI-SearchBot', 'ChatGPT-User',
   'Claude-SearchBot', 'Claude-User', 'PerplexityBot', 'Perplexity-User'];
 
-// Prefix-only independent REP oracle for these declarations. It deliberately
-// models specific groups replacing the wildcard group (no implicit inheritance).
+// Parse the actual Next serialization with the external REP implementation.
+// Specific groups replace wildcard groups; they do not inherit API exclusions.
 function allowed(token, pathname, rules = data.rules) {
-  const list = Array.isArray(rules) ? rules : [rules];
-  const tokens = rule => Array.isArray(rule.userAgent) ? rule.userAgent : [rule.userAgent];
-  const specific = list.filter(rule => tokens(rule).some(agent => agent.toLowerCase() === token.toLowerCase()));
-  const groups = specific.length ? specific : list.filter(rule => tokens(rule).includes('*'));
-  let match = { length: -1, allow: true };
-  for (const rule of groups) {
-    for (const action of ['disallow', 'allow']) {
-      const paths = typeof rule[action] === 'string' ? [rule[action]] : rule[action] || [];
-      for (const prefix of paths) {
-        if (prefix && pathname.startsWith(prefix) && prefix.length >= match.length) {
-          match = { length: prefix.length, allow: action === 'allow' };
-        }
-      }
-    }
-  }
-  return match.allow;
+  const text = typeof rules === 'string' ? rules : resolveRobots({ rules });
+  return robotsParser(`${canonical}/robots.txt`, text).isAllowed(`${canonical}${pathname}`, token);
 }
+
+test('Google-Extended uses wildcard public permission and API restriction without a specific group', () => {
+  assert(!/User-agent:\s*Google-Extended\s*$/im.test(body));
+  for (const pathname of ['/', '/experiences/3071', '/community/public?board=japan', '/login', '/account']) {
+    assert.equal(allowed('Google-Extended', pathname), true);
+  }
+  for (const pathname of ['/api/', '/api/payment/card-notification', '/api/auth/callback']) {
+    assert.equal(allowed('Google-Extended', pathname), false);
+  }
+});
+
+// Content Signals describe content use, outside REP Allow/Disallow. A REP
+// parser ignoring this extension must not be mistaken for policy alignment.
+function optionBConflicts(text) {
+  const conflicts = [];
+  if (!allowed('Google-Extended', '/experiences/3071', text)) conflicts.push('GOOGLE_EXTENDED_DISALLOW');
+  if (/^Content-signal:\s*.*\bai-train\s*=\s*no\b/im.test(text)) conflicts.push('TRAINING_SIGNAL_REQUIRES_REVIEW');
+  return conflicts;
+}
+
+test('managed Google-Extended Disallow invalidates Option B and is detected rather than overridden', () => {
+  const injected = `User-agent: Google-Extended\nDisallow: /\n\n${body}`;
+  assert.equal(allowed('Google-Extended', '/', injected), false);
+  assert.deepEqual(optionBConflicts(injected), ['GOOGLE_EXTENDED_DISALLOW']);
+  assert.equal(allowed('Googlebot', '/login', injected), true);
+  assert.equal(allowed('Googlebot', '/api/private', injected), false);
+});
+
+test('Cloudflare managed content-use signal is a separate policy conflict even if REP allows crawling', () => {
+  const signalOnly = `User-agent: *\nContent-signal: search=yes, ai-train=no, use=reference\nAllow: /\n\n${body}`;
+  assert.equal(allowed('Google-Extended', '/', signalOnly), true);
+  assert.deepEqual(optionBConflicts(signalOnly), ['TRAINING_SIGNAL_REQUIRES_REVIEW']);
+  const managed = `User-agent: Google-Extended\nDisallow: /\n\n${signalOnly}`;
+  assert.deepEqual(optionBConflicts(managed), ['GOOGLE_EXTENDED_DISALLOW', 'TRAINING_SIGNAL_REQUIRES_REVIEW']);
+  assert.deepEqual(optionBConflicts(body), []);
+});
 
 test('ordinary search and AI search/user fetchers can crawl public and noindex UI pages', () => {
   for (const bot of searchAndAgents) {
@@ -60,7 +83,11 @@ for (const bot of training) {
 }
 
 test('API crawl exclusion is preserved for every declared use case and unknown bots', () => {
-  for (const bot of [...training, ...searchAndAgents, 'UnknownBot']) assert(!allowed(bot, '/api/payment/card-notification'), bot);
+  for (const bot of [...training, ...searchAndAgents, 'Google-Extended', 'UnknownBot']) {
+    for (const pathname of ['/api/', '/api/payment/card-notification', '/api/auth/callback', '/api/private?query=1']) {
+      assert.equal(allowed(bot, pathname), false, `${bot}: ${pathname}`);
+    }
+  }
 });
 
 test('search noindex remains readable; robots does not claim to enforce privacy or indexing', () => {
@@ -79,11 +106,14 @@ test('equivalent prepended training groups cannot change the API/noindex search 
     assert(!allowed(bot, '/api/private', merged));
   }
   for (const bot of training) assert(!allowed(bot, '/', merged));
+  assert.equal(allowed('Google-Extended', '/', merged), true);
+  assert.equal(allowed('Google-Extended', '/api/private', merged), false);
 });
 
 test('negative controls expose an accidental specific allow that drops API protection and a noindex crawl block', () => {
   const badAllow = [data.rules[0], { userAgent: 'OAI-SearchBot', allow: '/' }];
   assert(allowed('OAI-SearchBot', '/api/private', badAllow));
+  assert(allowed('Google-Extended', '/api/private', [data.rules[0], { userAgent: 'Google-Extended', allow: '/' }]));
   assert(!allowed('Googlebot', '/account', [{ userAgent: '*', disallow: '/account' }]));
 });
 

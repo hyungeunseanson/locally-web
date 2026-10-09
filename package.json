@@ -185,6 +185,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "hasown": "2.0.2",
+    "robots-parser": "3.0.1",
     "side-channel": "1.1.0",
     "side-channel-list": "1.0.0",
     "tailwindcss": "^4",

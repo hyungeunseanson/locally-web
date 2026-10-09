@@ -9,16 +9,15 @@ export default function robots(): MetadataRoute.Robots {
       // private UI는 page-level noindex를 우선하고, robots.txt는 크롤 불필요한 API만 차단한다.
       disallow: ['/api/'],
     }, {
-      // Keep the training preference visible even when edge-managed robots
-      // directives are not prepended to this Worker-generated response.
-      // Product tokens (Google/Apple Extended) do not block their search crawlers.
+      // Option B preserves Google-Extended (Gemini training and grounding)
+      // through the wildcard rules, including their API exclusion.
+      // These seven opt-outs remain visible without edge-managed injection.
       userAgent: [
         'Amazonbot',
         'Applebot-Extended',
         'Bytespider',
         'CCBot',
         'ClaudeBot',
-        'Google-Extended',
         'GPTBot',
         'meta-externalagent',
       ],
