@@ -19,10 +19,9 @@ function dependencies(tasks: ExperienceTranslationLeasedTask[] = [task()]): Expe
     async getProviderModel() { return 'fixture-model'; },
     async markTaskProcessing() { events.push('processing'); },
     async markTaskCancelled() { events.push('cancelled'); },
-    async markTaskCompleted() { events.push('completed'); },
     async markTaskRetryable() { events.push('retryable'); },
     async markTaskFailed() { events.push('failed'); },
-    async applyExperienceTranslation() { events.push('update'); return true; },
+    async finalizeExperienceTranslation() { events.push('update'); events.push('completed'); return true; },
     async recordProviderOutcome() { events.push('provider-state'); },
   };
   return {
@@ -82,7 +81,7 @@ test.describe('experience translation Queue wake transport', () => {
     const deps = dependencies();
     deps.repository.fetchExperience = async () => ({ id: 3309, source_locale: 'ko', translation_version: 2, title: 'source', description: 'source', manual_locales: ['en'], title_en: 'Reviewed title', description_en: 'Reviewed English description'  });
     let payload: Record<string, unknown> = {};
-    deps.repository.applyExperienceTranslation = async (_task, next) => { payload = next; return true; };
+    deps.repository.finalizeExperienceTranslation = async (_task, next) => { payload = next; return true; };
     await runExperienceTranslationWorker(deps);
     expect(payload).not.toHaveProperty('title_en');
     expect(payload).not.toHaveProperty('description_en');

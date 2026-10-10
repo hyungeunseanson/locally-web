@@ -31,9 +31,19 @@
     "supabase/migrations/20261006133015_admin_chat_canonical_recency.sql",
     "supabase/migrations/20261006173453_community_freeze_safeupdate.sql",
     "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
-    "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql"
+    "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
+    "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql"
   ],
-  "pendingProductionMigrations": [],
+  "pendingProductionMigrations": [
+    {
+      "version": "20261010102639",
+      "name": "translation_queue_recovery_p1",
+      "repositoryFile": "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
+      "repositorySha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce",
+      "status": "approval_required",
+      "automaticProductionApply": false
+    }
+  ],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

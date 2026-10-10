@@ -1,0 +1,72 @@
+Translation Queue P1 — proposed SQL, NOT installed in Production
+
+Failure: the legacy Worker saves experience fields and task completion in two
+requests. If the second request fails, queued/retryable-only leasing cannot
+recover the processing row. No active stuck Production rows were observed.
+
+The new RPC commits experience, completion receipt, task and job together.
+The legacy experience UPDATE trigger provides the same transaction boundary
+for the protected Worker. Receipts store exact locale fields, task identity and
+translation version; a ready metadata flag alone is never a completion proof.
+Manual locale fields remain unchanged. The trigger preserves media_revision
+assigned by the existing earlier trigger and preserves sibling locale fields.
+
+Legacy task PATCH requests carry no lease token. Reclaim therefore retires the
+old task IDs AND advances experience.translation_version before creating a new
+job and unfinished-locale tasks. This uses the legacy Worker's existing version
+filter as a fence. Terminal row guards prevent late unqualified PATCH requests
+from reopening retired/completed tasks or jobs. Retryable tasks also rotate once,
+retaining provider/backoff/attempt state. Only one locale lease per experience
+is allowed, including across providers. No state-format or DO migration occurs.
+
+The new finalizer locks experience then task, checks task/version/lease identity
+and expiry, and is idempotent after commit. An expired finalization throws a
+retryable infrastructure error instead of cancelling recoverable work. Provider
+outcome failure or lost ACK after commit cannot reopen the completed task or
+cause another AI call. An AI request still running when its lease expires may
+be repeated by recovery; exactly-once external AI execution is not claimed.
+Its late result cannot overwrite the recovered generation.
+
+Installation is selective and transactional: lock_timeout 5s, statement_timeout
+60s, exact pre-existing lease function body hashes, and no leased/processing
+rows. A failed precondition rolls back all installation work. The existing
+migration ledger, historical baseline, financial SQL and Runtime files are not
+modified or replayed in Production. No historical row repair is installed.
+The SQL advances versions only later when a normal Worker wake reclaims work.
+Existing provider limits, public RPC object IDs/dependencies and both lease overload return shapes remain. Superseded source-version tasks are cancelled on normal recovery wakes and excluded from dispatch, so they cannot starve current work.
+
+Run:
+  TRANSLATION_PG17_MODULES=<pinned-tooling>/node_modules \
+  TRANSLATION_POSTGREST=<official-PostgREST-16.4-binary> \
+  node tests/integration/translation-recovery/native.mjs
+On macOS the native libpq directory may also be needed in DYLD_LIBRARY_PATH.
+CI uses the existing pinned PostgreSQL 17.6 and official PostgREST checksum.
+All database/REST connections use disposable loopback fixtures and synthetic JWTs.
+
+Optional generated-Worker proof:
+  TRANSLATION_WORKER_ARTIFACT_DIRS='{"protected":"<downloaded-modules>","candidate":"<built-modules>","rollback":"<downloaded-modules>"}'
+The optional run invokes all five Cron entrypoints twice concurrently in real
+workerd, with all eight live scheduled feature flags enabled. Each version uses
+the same isolated PG/PostgREST state, local R2/DO/Queues, synthetic zero-backlog
+Cloudflare metrics and no real provider calls. Cron handler runs use no due
+customer rows; separate real SQL positive/race cases test completion, cancellation,
+alert claims, retention and popularity. Real email/NICEPAY/DLQ delivery and full
+positive customer journeys are NOT claimed by these Cron probes.
+
+Covered boundaries include normal commit, pre-write loss/expired processing,
+legacy partial-write loss, injected AFTER UPDATE failure after task/job writes and full rollback, leased
+and processing expiry, duplicate delivery/finalization, old/new transitions in
+both directions, late AI results, provider-outcome loss, ACK loss, source version,
+manual fields, cancellation races, sibling locale/job aggregate, backoff,
+no-eligible versus in-flight state, invalid-message attempts through the configured
+retry limit, role denial, owner/search path/overload ACLs and installation refusal.
+The provider's actual DLQ routing is a separate existing configuration contract.
+
+Release order:
+1. Merge only after exact PR head checks pass. Uploading a Version is allowed.
+2. Request separate approval for this exact SQL/hash; do NOT run db push.
+3. After approval, recheck live catalog and no in-flight tasks; apply only this
+   migration, then run supabase/staging/translation-recovery-contract.sql and
+   compare normalized catalog plus financial/storage protections.
+4. Deploy only after all release gates pass. Protected Worker rollback uses
+   the additive new DB contract, not a destructive down migration.
