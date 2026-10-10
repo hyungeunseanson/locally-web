@@ -1127,24 +1127,31 @@ function PaymentContent() {
 
         router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
       } catch (err: unknown) {
-        if (isCardPaymentCancelledError(err)) {
+        let pendingVerification = false;
+        if (cardProvider === 'nicepay' || isCardPaymentCancelledError(err)) {
           try {
             const releaseResponse = await fetch('/api/payment/release-card', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ orderId: newOrderId }),
             });
-
-            if (!releaseResponse.ok) {
-              console.warn('[EXPERIENCE] Card hold release was not applied:', releaseResponse.status);
+            const releaseResult = await releaseResponse.json() as {
+              confirmed?: boolean; pendingVerification?: boolean; released?: boolean;
+            };
+            if (releaseResult.confirmed) {
+              router.push(`/experiences/${experienceId}/payment/complete?orderId=${newOrderId}`);
+              return;
             }
+            pendingVerification = Boolean(releaseResult.pendingVerification) || !releaseResponse.ok;
           } catch (releaseError) {
-            console.error('[EXPERIENCE] Card hold release request failed:', releaseError);
+            pendingVerification = true;
+            console.error('[EXPERIENCE] Card hold recovery request failed:', releaseError);
           }
         }
 
-        const message =
-          err instanceof Error ? err.message : (t('exp_payment_card_process_error') as string);
+        const message = pendingVerification
+          ? (t('exp_payment_card_pending_verification') as string)
+          : err instanceof Error ? err.message : (t('exp_payment_card_process_error') as string);
         setPaymentError(message);
         showToast(message, 'error');
         setIsProcessing(false);

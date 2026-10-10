@@ -6,7 +6,8 @@ export type LocallyScheduledTaskName =
   | 'experience_completion_sync'
   | 'service_completion_sync'
   | 'cancel_pending_bookings'
-  | 'ops_anomaly_monitor';
+  | 'ops_anomaly_monitor'
+  | 'nicepay_recovery';
 
 type ScheduledControllerLike = { cron: string };
 type ScheduledHandler<Environment> = (
@@ -28,6 +29,7 @@ type ScheduledOptions<Environment> = {
   runServiceCompletionSync: ScheduledHandler<Environment>;
   runCancelPendingBookings?: ScheduledHandler<Environment>;
   runOpsAnomalyMonitor?: ScheduledHandler<Environment>;
+  runNicePayRecovery?: ScheduledHandler<Environment>;
   delegate?: ScheduledHandler<Environment>;
   log?: (entry: Record<string, unknown>) => void;
 };
@@ -79,6 +81,10 @@ export async function handleLocallyScheduledEvent<Environment>(
     ...(options.runOpsAnomalyMonitor ? [{
       name: 'ops_anomaly_monitor' as const,
       run: options.runOpsAnomalyMonitor,
+    }] : []),
+    ...(options.runNicePayRecovery ? [{
+      name: 'nicepay_recovery' as const,
+      run: options.runNicePayRecovery,
     }] : []),
   ] : controller.cron === options.notificationRetentionCron ? [
     {

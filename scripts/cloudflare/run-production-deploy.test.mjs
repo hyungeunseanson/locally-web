@@ -42,6 +42,7 @@ import {
   parseDeploymentArguments,
   resolveAllowedPlannedChanges,
   resolveAllowedPlannedCronAdditions,
+  resolveProductionDeploymentContract,
 } from './run-production-deploy.mjs';
 import { readTranslationReleasePolicy, resolveTranslationReleaseProfile } from './experience-translation-release-profile.mjs';
 import { readHomePopularityReleasePolicy, resolveHomePopularityReleaseProfile } from './home-popularity-release-profile.mjs';
@@ -838,4 +839,15 @@ test('completes successfully when browser smoke passes', async () => {
     log: () => {},
   });
   assert.deepEqual(events, ['build', 'semantic-preflight', 'pre-smoke', 'wrangler', 'post-smoke']);
+});
+
+
+test('NICEPAY recovery requires an explicit release flag after the database migration', async () => {
+  const defaultContract = await resolveProductionDeploymentContract(parseDeploymentArguments(['--dry-run']));
+  assert.equal(defaultContract.runtimeVariables.NICEPAY_RECOVERY_SCHEDULED_ENABLED, 'false');
+  const options = parseDeploymentArguments(['--dry-run', '--enable-nicepay-recovery']);
+  const enabled = await resolveProductionDeploymentContract(options);
+  assert.equal(enabled.runtimeVariables.NICEPAY_RECOVERY_SCHEDULED_ENABLED, 'true');
+  assert.ok(resolveAllowedPlannedChanges(options).includes('NICEPAY_RECOVERY_SCHEDULED_ENABLED'));
+  assert.ok(enabled.wranglerArguments.includes('NICEPAY_RECOVERY_SCHEDULED_ENABLED:true'));
 });

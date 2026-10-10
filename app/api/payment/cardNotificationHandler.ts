@@ -7,6 +7,7 @@ import { isCancelledBookingStatus, isConfirmedBookingStatus } from '@/app/consta
 import { isCancelledServiceBooking } from '@/app/constants/serviceStatus';
 import type { ProxyCategory } from '@/app/types/proxy';
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
+import { PHASE2_SAFE_RELEASE_REASON } from '@/app/utils/payments/card/nicepayRecovery';
 import {
   isMatchingAppliedSoloNicePayRefund,
   isSoloRefundNotificationForBooking,
@@ -247,7 +248,7 @@ async function processExperienceNotification(params: {
   const isExplicitReleasedCardHold =
     isCancelledBookingStatus(String(booking.status || '')) &&
     !booking.tid &&
-    booking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+    [EXPLICIT_CARD_CHECKOUT_CANCEL_REASON, PHASE2_SAFE_RELEASE_REASON].includes(String(booking.cancel_reason || ''));
   const isPaidLike = isConfirmedBookingStatus(String(booking.status || ''));
 
   if (
@@ -288,6 +289,7 @@ async function processExperienceNotification(params: {
   });
 
   if (!confirmationResult.success) {
+    if (confirmationResult.lateApprovalRecorded) return buildNotificationOkResponse();
     return NextResponse.json(
       { success: false, error: confirmationResult.error },
       { status: confirmationResult.status }

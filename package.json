@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test:contract-preflight": "node --test scripts/ci/contract-preflight.test.mjs && node scripts/ci/contract-preflight.mjs --all",
+    "test:payment:phase2": "node scripts/supabase/test-experience-nicepay-phase2.mjs && node tests/unit/nicepay-phase2-proof.test.mjs && node tests/unit/nicepay-phase2-runtime.test.mjs && node tests/unit/nicepay-phase2-scheduled.test.mjs && node --test tests/unit/nicepay-solo-refund-notification.test.mjs",
     "test:solo-guarantee-p0:native": "node tests/integration/solo-guarantee-p0.pg17.mjs",
     "test:solo-refund-ledger-proof": "node --test tests/unit/solo-refund-provider-ledger-proof.test.mjs",
     "test:solo-guarantee-p0:browser": "node tests/integration/solo-guarantee-p0.browser.mjs",

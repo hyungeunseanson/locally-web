@@ -14,6 +14,7 @@ import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { isTargetedNicePayCloseout } from '@/app/utils/payments/card/targetedCloseoutTargets';
 import { recordTargetedNicePayApproval } from '@/app/utils/payments/card/targetedNicePayCloseout';
+import { markNicePayConfirmed, recordNicePayApproval } from '@/app/utils/payments/card/nicepayRecovery';
 
 type ExperienceMeta = {
   price?: number | null;
@@ -60,6 +61,7 @@ type ExperienceCardConfirmationResult =
       success: false;
       status: number;
       error: string;
+      lateApprovalRecorded?: boolean;
     };
 
 async function reconcileExplicitReleasedNicePayApproval(params: {
@@ -191,6 +193,24 @@ export async function finalizeExperienceCardPayment(params: {
   if (releasedApprovalResolution) return releasedApprovalResolution;
 
   try {
+    if (params.verificationResult.provider === 'nicepay') {
+      const evidenceState = await recordNicePayApproval({
+        client: params.supabaseAdmin,
+        bookingId: params.originalBooking.id,
+        orderId: params.originalBooking.order_id || params.originalBooking.id,
+        tid: params.verificationResult.providerTransactionId,
+        amount: params.verificationResult.approvedAmount,
+      });
+      if (evidenceState === 'late_approval') {
+        await insertAdminAlerts({
+          title: '[긴급] 해제된 좌석의 NICEPAY 승인 확인',
+          message: `예약 ${params.originalBooking.order_id || params.originalBooking.id}: 승인 증거를 금융 복구 원장에 보존했습니다. 수동 대조가 필요합니다.`,
+          link: '/admin/dashboard?tab=LEDGER',
+        }).catch(() => undefined);
+        return { success: false, status: 409, lateApprovalRecorded: true,
+          error: '승인된 거래가 이미 해제된 예약에 도착했습니다. 운영자 확인이 필요합니다.' };
+      }
+    }
     const confirmation = await confirmExperiencePayment({
       supabaseAdmin: params.supabaseAdmin,
       bookingId: params.originalBooking.id,
@@ -200,6 +220,12 @@ export async function finalizeExperienceCardPayment(params: {
       verifiedAmount: params.verificationResult.approvedAmount,
     });
 
+    if (params.verificationResult.provider === 'nicepay') {
+      await markNicePayConfirmed({
+        client: params.supabaseAdmin, bookingId: params.originalBooking.id,
+        tid: params.verificationResult.providerTransactionId,
+      });
+    }
     if (confirmation.outcome === 'already_processed') {
       return { success: true, alreadyProcessed: true };
     }

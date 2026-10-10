@@ -5,6 +5,7 @@ import {
   ExperiencePaymentContractError,
 } from '@/app/utils/bookings/experiencePaymentClaims';
 import { getCurrentCardPaymentProvider } from '@/app/utils/payments/card/server';
+import { prepareNicePayAttempt } from '@/app/utils/payments/card/nicepayRecovery';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -27,8 +28,9 @@ export async function POST(request: Request) {
     }
 
     const provider = getCurrentCardPaymentProvider();
+    const supabaseAdmin = createAdminClient();
     const claim = await claimExperiencePaymentAtomic({
-      supabaseAdmin: createAdminClient(),
+      supabaseAdmin,
       bookingId: orderId,
       userId: user.id,
       provider,
@@ -40,6 +42,22 @@ export async function POST(request: Request) {
         { success: false, error: '카드 결제를 안전하게 시작할 수 없습니다.' },
         { status: 409 }
       );
+    }
+
+    if (provider === 'nicepay') {
+      const { data: booking, error: bookingError } = await supabaseAdmin.from('bookings')
+        .select('id, order_id, user_id, amount')
+        .eq('id', orderId).maybeSingle();
+      if (bookingError || !booking || booking.user_id !== user.id || booking.order_id !== orderId) {
+        throw new Error('NICEPAY attempt booking lookup failed');
+      }
+      const attemptState = await prepareNicePayAttempt({
+        client: supabaseAdmin, bookingId: booking.id, orderId: booking.order_id,
+        amount: Number(booking.amount),
+      });
+      if (attemptState !== 'claimed') {
+        return NextResponse.json({ success: false, error: '이전 카드 결제 승인 상태를 확인 중입니다. 중복 결제하지 마세요.' }, { status: 409 });
+      }
     }
 
     return NextResponse.json({

@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { verifyNicePayAuthPayload } from '@/app/utils/payments/card/server';
+import { observeNicePayAuth } from '@/app/utils/payments/card/nicepayRecovery';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
 function escapeJsonForInlineScript(value: unknown) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -62,9 +65,32 @@ export async function POST(request: Request) {
   const payload = Object.fromEntries(
     Array.from(formData.entries()).map(([key, value]) => [key, String(value)])
   );
+  let relayPayload = payload;
+  if (payload.AuthResultCode === '0000' && String(payload.Moid || '').startsWith('ORD-')) {
+    try {
+      const client = createAdminClient();
+      const { data: booking, error } = await client.from('bookings')
+        .select('id, order_id, amount, payment_provider')
+        .eq('order_id', payload.Moid).maybeSingle();
+      if (error || !booking || booking.payment_provider !== 'nicepay') {
+        throw new Error('NICEPAY relay booking mismatch');
+      }
+      const auth = verifyNicePayAuthPayload({
+        providerPayload: payload, orderId: booking.order_id,
+        expectedAmount: Number(booking.amount),
+      });
+      await observeNicePayAuth({
+        client, bookingId: booking.id, orderId: auth.orderId!,
+        tid: auth.tid, mid: auth.mid, amount: auth.amount,
+      });
+    } catch {
+      // No approval can begin without the durable auth gate.
+      relayPayload = { AuthResultCode: 'PHASE2_RETRY', AuthResultMsg: '결제 상태 확인이 지연되고 있습니다. 예약 상태를 다시 확인해 주세요.' };
+    }
+  }
   const html = renderRelayHtml({
     origin: new URL(request.url).origin,
-    payload,
+    payload: relayPayload,
   });
 
   return new NextResponse(html, {

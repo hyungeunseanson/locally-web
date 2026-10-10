@@ -117,6 +117,9 @@ function fixture({ rows = { bookings: [booking], booking_solo_refund_operations:
     '@/app/api/payment/experienceCardConfirmation': { finalizeExperienceCardPayment: finalize('experience') },
     '@/app/api/services/payment/serviceCardConfirmation': { finalizeServiceCardPayment: finalize('service') },
     '@/app/api/proxy-bookings/payment/proxyCardConfirmation': { finalizeProxyCardPayment: finalize('proxy') },
+    '@/app/utils/payments/card/nicepayRecovery': {
+      PHASE2_SAFE_RELEASE_REASON: 'NICEPAY 승인 전 확인된 결제 중단 (PHASE2)',
+    },
   });
   const handler = load('app/api/payment/cardNotificationHandler.ts');
   return {
@@ -281,9 +284,9 @@ for (const domain of [
     t.mock.method(globalThis, 'fetch', async (url, options) => {
       assert.equal(String(url), 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp');
       inquiries.push(new URLSearchParams(options.body));
-      return Response.json({ ResultCode: '0000', Status: '0' });
+      return Response.json({ ResultCode: '0000', Status: '0', TID: 'SYNTHETIC-APPROVAL-TID' });
     });
-    await assertOk(await f.post(request({ MOID: domain.id, TID: 'SYNTHETIC-APPROVAL-TID',
+    await assertOk(await f.post(request({ MOID: domain.id, MID: 'nictest00m', TID: 'SYNTHETIC-APPROVAL-TID',
       Amt: String(domain.amount), PayMethod: 'CARD', StateCd: '0', ResultCode: '3001' })));
     assert.equal(inquiries.length, 1);
     assert.equal(inquiries[0].get('TID'), 'SYNTHETIC-APPROVAL-TID');

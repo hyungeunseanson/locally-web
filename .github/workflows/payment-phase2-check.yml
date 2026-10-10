@@ -1,0 +1,43 @@
+name: Payment PHASE2 Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'app/api/payment/**'
+      - 'app/utils/payments/card/**'
+      - 'app/experiences/[id]/payment/**'
+      - 'app/context/LanguageContext.tsx'
+      - 'app/utils/opsAnomalyMonitorScheduled.ts'
+      - 'app/utils/cloudflareScheduled.ts'
+      - 'cloudflare-worker.ts'
+      - 'app/help/faqContent.ts'
+      - 'supabase/migrations/*experience_nicepay_recovery.sql'
+      - 'scripts/supabase/test-experience-nicepay-phase2.mjs'
+      - 'tests/unit/nicepay-phase2-*.test.mjs'
+      - 'package.json'
+      - '.github/workflows/payment-phase2-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Test migration, NICEPAY proof and recovery races with local fixtures
+        run: npm run test:payment:phase2
+      - name: Preserve existing booking claim, bank, PayPal and card contract
+        run: node scripts/supabase/test-experience-payment-claim.mjs
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint changed payment runtime
+        run: npx eslint app/api/payment/nicepay-callback/route.ts app/api/payment/release-card/route.ts app/api/payment/card-claim/route.ts app/api/payment/nicepay/relay/route.ts app/api/payment/experienceCardConfirmation.ts app/api/payment/cardNotificationHandler.ts app/utils/payments/card/server.ts app/utils/payments/card/client.ts app/utils/payments/card/nicepayRecovery.ts app/utils/payments/card/nicepayRecoveryScheduled.ts app/utils/opsAnomalyMonitorScheduled.ts app/utils/cloudflareScheduled.ts cloudflare-worker.ts
+      - run: git diff --check

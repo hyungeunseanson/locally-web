@@ -800,6 +800,7 @@ test.describe('Card payment provider cutover contracts', () => {
           ResultCode: '3001',
           ResultMsg: 'Approval complete',
           TID: 'TX-TID-001',
+          MID: process.env.NICEPAY_MID!,
           Moid: 'ORD-NICEPAY-VERIFY-001',
           Amt: nicePayAmount,
           PayMethod: 'CARD',
@@ -911,6 +912,7 @@ test.describe('Card payment provider cutover contracts', () => {
         },
         body: new URLSearchParams({
           Moid: 'ORD-NICEPAY-NOTI-001',
+          MID: process.env.NICEPAY_MID!,
           TID: 'TX-TID-NOTI-001',
           Amt: '45000',
           ResultCode: '3001',

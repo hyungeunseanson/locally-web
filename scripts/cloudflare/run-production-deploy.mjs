@@ -36,6 +36,7 @@ export function parseDeploymentArguments(argumentsList) {
   let requestedCancelPendingBookingsProfile;
   let requestedOpsAnomalyMonitorProfile;
   let allowCancelPendingCronAddition = false;
+  let nicepayRecoveryEnabled = false;
   let dryRun = false;
   for (const argument of argumentsList) {
     if (argument.startsWith('--media-profile=')) {
@@ -81,6 +82,8 @@ export function parseDeploymentArguments(argumentsList) {
     } else if (argument === '--allow-cancel-pending-cron-addition') {
       assert(!allowCancelPendingCronAddition, 'Allow the Cancel Pending Bookings Cron addition only once.');
       allowCancelPendingCronAddition = true;
+    } else if (argument === '--enable-nicepay-recovery') {
+      nicepayRecoveryEnabled = true;
     } else if (argument === '--dry-run') {
       dryRun = true;
     } else {
@@ -110,10 +113,11 @@ export function parseDeploymentArguments(argumentsList) {
       ? { allowCancelPendingCronAddition: true }
       : {}),
     dryRun,
+    ...(nicepayRecoveryEnabled ? { nicepayRecoveryEnabled: true } : {}),
   };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }, opsAnomalyMonitorProfile = { scheduledEnabled: 'false' }) {
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false, nicepayRecoveryEnabled = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }, opsAnomalyMonitorProfile = { scheduledEnabled: 'false' }) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,
@@ -136,6 +140,7 @@ export function buildDeploymentContract(profile, translationProfile, homePopular
     SERVICE_COMPLETION_SCHEDULED_ENABLED: serviceCompletionProfile.scheduledEnabled,
     CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED: cancelPendingBookingsProfile.scheduledEnabled,
     OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED: opsAnomalyMonitorProfile.scheduledEnabled,
+    NICEPAY_RECOVERY_SCHEDULED_ENABLED: nicepayRecoveryEnabled ? 'true' : 'false',
   };
   const wranglerArguments = [
     'deploy',
@@ -172,6 +177,7 @@ export function resolveAllowedPlannedChanges(options) {
   if (options.requestedServiceCompletionProfile) changes.push('SERVICE_COMPLETION_SCHEDULED_ENABLED');
   if (options.requestedCancelPendingBookingsProfile) changes.push('CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED');
   if (options.requestedOpsAnomalyMonitorProfile) changes.push('OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED');
+  if (options.nicepayRecoveryEnabled) changes.push('NICEPAY_RECOVERY_SCHEDULED_ENABLED');
   return changes;
 }
 

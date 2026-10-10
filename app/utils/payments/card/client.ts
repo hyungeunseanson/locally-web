@@ -42,6 +42,13 @@ export class CardPaymentCancelledError extends Error {
   }
 }
 
+export class CardPaymentInterruptedError extends Error {
+  constructor(readonly reason: 'window_closed' | 'timeout', message: string) {
+    super(message);
+    this.name = 'CardPaymentInterruptedError';
+  }
+}
+
 export function isCardPaymentCancelledError(error: unknown): error is CardPaymentCancelledError {
   return error instanceof CardPaymentCancelledError;
 }
@@ -338,12 +345,12 @@ function requestNicePayCardPayment(params: CardPaymentLaunchParams): Promise<Car
 
     closePollTimer = window.setInterval(() => {
       if (popup.closed) {
-        rejectWithCleanup(new Error('결제창이 닫혔습니다. 다시 시도해주세요.'));
+        rejectWithCleanup(new CardPaymentInterruptedError('window_closed', '결제창이 닫혔습니다.'));
       }
     }, 1000);
 
     pollTimer = window.setTimeout(() => {
-      rejectWithCleanup(new Error('결제 응답이 지연되고 있습니다. 다시 시도해주세요.'));
+      rejectWithCleanup(new CardPaymentInterruptedError('timeout', '결제 응답이 지연되고 있습니다.'));
     }, 5 * 60 * 1000);
   });
 }
