@@ -43,7 +43,7 @@ try{
  await c.query('CREATE TABLE bookings('+fields('bookings')+');CREATE TABLE booking_solo_refund_operations('+fields('booking_solo_refund_operations')+');CREATE TABLE booking_solo_refund_attempts('+fields('booking_solo_refund_attempts')+");CREATE TABLE experiences(id bigint PRIMARY KEY,host_id uuid,title text,price numeric,private_price numeric,max_guests integer,solo_guarantee_price integer,duration integer);CREATE TABLE service_bookings(tid text);CREATE TABLE proxy_requests(tid text);");
  await c.query(await readFile(fixture+'/baseline.sql','utf8'));
  await c.query('CREATE TRIGGER bookings_money_transition_authority BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION private.guard_booking_money_transition();CREATE TRIGGER bookings_payment_claim_columns_server_only BEFORE INSERT OR UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION guard_experience_payment_claim_columns();');
- const migration=await readFile(root+'/supabase/migrations/20261009035059_targeted_nicepay_ab_closeout.sql','utf8');
+ const migration=await readFile(root+'/docs/financial/installed/20261009035059_targeted_nicepay_ab_closeout.sql','utf8');
  await c.query(migration);
  // Install the existing cancellation/payout authorities verbatim; no substitute locks.
  const financialSql=await readFile(root+'/supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql','utf8');

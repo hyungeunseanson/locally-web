@@ -27,6 +27,8 @@ jobs:
           curl --fail --location --retry 0 https://github.com/PostgREST/postgrest/releases/download/v16.4/postgrest-v16.4-linux-static-x86-64.tar.xz -o "$RUNNER_TEMP/postgrest.tar.xz"
           echo "b47ecc82fce1dcebbbc4183d839e52f07f7630c9d7ad0f54db753d1939299354  $RUNNER_TEMP/postgrest.tar.xz" | sha256sum --check --strict
           tar -xJf "$RUNNER_TEMP/postgrest.tar.xz" -C "$RUNNER_TEMP"
+      - name: Validate exact operating source and installed catalog, including negative controls
+        run: node --test tests/unit/phase1-protected-source.test.mjs
       - name: Replay protection and installed V2 on synthetic local data only
         env:
           TARGETED_LEGACY_REVISION: e4933ce1c00707b792e69911a0791726a6a7e956
