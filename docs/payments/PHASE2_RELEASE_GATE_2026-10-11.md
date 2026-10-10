@@ -15,7 +15,7 @@
 | A/B | 두 예약 모두 `cancelled`/`released`, TID 없음, 환불액·호스트 정산액·플랫폼 수익 0원. `private.targeted_card_closeouts` 2건. |
 | C | `PAID`/`completed`, TID 존재, 금액 46,200원, 호스트 정산액 33,600원, 플랫폼 수익 12,600원, 환불액 0원. |
 | A/B PG 증거 | 2026-10-10 17:05 UTC NICEPAY 운영 가맹점 관리자 `FIsonnerdm`의 통합거래조회에서 거래일자 2026/10/08~2026/10/11, 주문번호별, 모든 상태·결제서비스로 직접 조회. A/B 각각 승인 0건·취소 0건·거래 행 0건. PHASE 1 원장 확인 시각(2026-10-09 16:09 UTC) 이후 새 금융 거래는 없었다. C는 카드 승인 1건·46,200원, 취소 0건이며 상세 TID가 DB와 정확히 일치했다. C 승인일 2026/10/09, 승인매입일 2026/10/10, 정산 예정일 2026/10/20로 표시됐다. |
-| 백업·복구 | [운영 백업 실행 38069534146](https://github.com/hyungeunseanson/locally-web/actions/runs/38069534146) 성공. 2026-10-10 16:54:37 UTC 시작, 격리 Postgres 17에 복원해 데이터 건수·권한·보안 객체·Realtime 구성을 비교하고 `RESTORE_COUNTS_SECURITY_OBJECTS_AND_REALTIME_PASS` 확인. R2 `daily/2026-10-10T16-54-37Z-38069534146-1/`에 age 암호화 백업 및 SHA-256 저장, 재다운로드 체크섬 검증 성공. 원본 기존 백업은 보존. |
+| 백업·복구 | [운영 백업 실행 38069534146](https://github.com/hyungeunseanson/locally-web/actions/runs/38069534146) 성공. 2026-10-10 16:54:37 UTC 시작, 격리 Postgres 17에 복원해 데이터 건수·권한·보안 객체·Realtime 구성을 비교하고 `RESTORE_COUNTS_SECURITY_OBJECTS_AND_REALTIME_PASS` 확인. R2 `daily/2026-10-10T16-54-37Z-38069534146-1/`에 age 암호화 백업 및 SHA-256 저장. 로컬에서 같은 원격 객체와 체크섬을 다시 다운로드하고 오프라인 복구 키(0600)로 복호화해 내부 모든 파일 체크섬을 검증(`R2_DOWNLOAD_DECRYPT_AND_INTERNAL_CHECKSUM_PASS`). 기존 백업과 복구 키는 보존. |
 
 NICEPAY 공식 문서가 지정한 `npg.nicepay.co.kr`에 운영 계정으로 로그인해 거래를 직접 재조회했다. 거래가 없는 A/B에는 승인·취소·정산 대상 TID도 없고, C의 승인·매입·정산 예정 및 TID는 운영 DB와 일치한다. 결제 취소·환불 버튼은 사용하지 않았다.
 
