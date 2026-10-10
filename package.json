@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "test:contract-preflight": "node --test scripts/ci/contract-preflight.test.mjs && node scripts/ci/contract-preflight.mjs --all",
     "test:solo-guarantee-p0:native": "node tests/integration/solo-guarantee-p0.pg17.mjs",
     "test:solo-refund-ledger-proof": "node --test tests/unit/solo-refund-provider-ledger-proof.test.mjs",
     "test:solo-guarantee-p0:browser": "node tests/integration/solo-guarantee-p0.browser.mjs",
@@ -74,7 +75,7 @@
     "supabase:p0-security:contract": "node scripts/supabase/test-p0-security-migration.mjs && NODE_OPTIONS=--conditions=react-server NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-p0-security-anon-key SUPABASE_SERVICE_ROLE_KEY=local-p0-security-service-role-key playwright test -c playwright.contracts.config.ts tests/e2e/256-supabase-p0-security-hardening.spec.ts --project=chromium --workers=1",
     "supabase:admin-reader-private:contract": "node scripts/supabase/test-admin-reader-private-migration.mjs",
     "supabase:experience-payment-claim:contract": "node scripts/supabase/test-experience-payment-claim.mjs && NODE_OPTIONS=--conditions=react-server NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54329 NEXT_PUBLIC_SUPABASE_ANON_KEY=local-payment-claim-anon-key SUPABASE_SERVICE_ROLE_KEY=local-payment-claim-service-role-key playwright test -c playwright.contracts.config.ts tests/e2e/263-cancel-pending-payment-claim-race.spec.ts tests/e2e/264-experience-card-launch-boundary.spec.ts --project=chromium --workers=1",
-    "backup:restore:contract": "bash tests/backup/backup-contract.test.sh && bash tests/backup/postgres-container-lifecycle.test.sh && npm run backup:storage:contract",
+    "backup:restore:contract": "bash tests/backup/pinned-image-pull.test.sh && bash tests/backup/backup-contract.test.sh && bash tests/backup/postgres-container-lifecycle.test.sh && npm run backup:storage:contract",
     "backup:restore:runtime": "bash tests/backup/restore-runtime.test.sh",
     "backup:storage:contract": "python3 scripts/backup/storage_byte_backup_test.py",
     "supabase:staging:seed": "node scripts/supabase/staging-fixtures.mjs seed",
