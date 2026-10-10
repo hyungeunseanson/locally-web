@@ -41,6 +41,10 @@ export type OpsAnomalyQueueRuntime = {
 
 const DATABASE_DIAGNOSTIC_CODES = new Set<OpsAnomalyDiagnosticCode>([
   'payment_reconciliation_required',
+  'targeted_card_recovery_a',
+  'targeted_card_recovery_b',
+  'targeted_card_notification_a',
+  'targeted_card_notification_b',
   'payment_state_inconsistent',
   'refund_attention_required',
   'payout_attention_required',
@@ -136,7 +140,11 @@ export async function loadDatabaseOpsAnomalies(params: {
     throw new Error('ops_anomaly_database_snapshot_failed');
   }
 
-  return (data as DatabaseSnapshotRow[]).map((row) => {
+  const targeted = await params.supabaseAdmin.rpc('get_targeted_card_ops_snapshot');
+  if (targeted.error || !Array.isArray(targeted.data)) {
+    throw new Error('ops_anomaly_targeted_snapshot_failed');
+  }
+  return ([...data, ...targeted.data] as DatabaseSnapshotRow[]).map((row) => {
     const diagnosticCode = String(row.diagnostic_code || '') as OpsAnomalyDiagnosticCode;
     if (!DATABASE_DIAGNOSTIC_CODES.has(diagnosticCode)) {
       throw new Error('ops_anomaly_database_snapshot_invalid');

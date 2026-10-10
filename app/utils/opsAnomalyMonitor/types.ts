@@ -2,6 +2,10 @@ export type OpsAnomalySeverity = 'info' | 'warning' | 'critical';
 
 export type OpsAnomalyDiagnosticCode =
   | 'payment_reconciliation_required'
+  | 'targeted_card_recovery_a'
+  | 'targeted_card_recovery_b'
+  | 'targeted_card_notification_a'
+  | 'targeted_card_notification_b'
   | 'payment_state_inconsistent'
   | 'refund_attention_required'
   | 'payout_attention_required'
@@ -18,6 +22,8 @@ export type OpsAnomaly = {
 
 export type OpsAnomalyMonitorState = {
   activeDiagnostics: OpsAnomalyDiagnosticCode[];
+  notificationEventVersionByCode?: Partial<Record<OpsAnomalyDiagnosticCode, number>>;
+  financialEventVersionByCode?: Partial<Record<OpsAnomalyDiagnosticCode, number>>;
   alertedAtByCode: Partial<Record<OpsAnomalyDiagnosticCode, string>>;
 };
 

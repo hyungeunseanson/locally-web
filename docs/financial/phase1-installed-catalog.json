@@ -1,0 +1,335 @@
+{
+  "sourceTree": "c04ca87d4e3764d9b1abe28700f552e915da927a",
+  "sourceBase": "e4933ce1c00707b792e69911a0791726a6a7e956",
+  "capturedAt": "2026-10-10T01:03:48.128Z",
+  "scope": "schema catalog only; no rows",
+  "migrationLedger": [
+    {
+      "version": "20260912034545",
+      "name": "remote_schema"
+    },
+    {
+      "version": "20260912050655",
+      "name": "service_concierge_assignment"
+    },
+    {
+      "version": "20260915141606",
+      "name": "p0_storage_rpc_security_hardening"
+    },
+    {
+      "version": "20260916024355",
+      "name": "experience_media_locator_cas"
+    },
+    {
+      "version": "20260916032730",
+      "name": "experience_storage_lockdown"
+    },
+    {
+      "version": "20260916111416",
+      "name": "review_tour_end_db_foundation"
+    },
+    {
+      "version": "20260916134243",
+      "name": "review_direct_write_lockdown"
+    },
+    {
+      "version": "20260918000000",
+      "name": "proxy_card_intake_atomic"
+    },
+    {
+      "version": "20260922081710",
+      "name": "experience_payment_claim_and_pending_cleanup"
+    },
+    {
+      "version": "20260922125140",
+      "name": "close_refunded_phone_proxy_requests"
+    },
+    {
+      "version": "20260923013312",
+      "name": "ops_anomaly_monitor_snapshot"
+    },
+    {
+      "version": "20260923084232",
+      "name": "one_time_review_request_reminders"
+    },
+    {
+      "version": "20260929144521",
+      "name": "harden_public_host_applications_security_barrier"
+    },
+    {
+      "version": "20260930022348",
+      "name": "move_is_admin_reader_to_private_schema"
+    },
+    {
+      "version": "20261002024534",
+      "name": "admin_message_monitoring_phase_1"
+    },
+    {
+      "version": "20261002024638",
+      "name": "admin_message_monitoring_historical_reinquiry"
+    },
+    {
+      "version": "20261002075149",
+      "name": "admin_attention_badges_phase_2"
+    },
+    {
+      "version": "20261003012400",
+      "name": "phone_followup_tasks"
+    },
+    {
+      "version": "20261003134417",
+      "name": "admin_chat_bounded_search"
+    },
+    {
+      "version": "20261004053224",
+      "name": "media_lifecycle_foundation"
+    },
+    {
+      "version": "20261005082309",
+      "name": "avatar_media_authority"
+    },
+    {
+      "version": "20261005104924",
+      "name": "solo_guarantee_financial_authority"
+    },
+    {
+      "version": "20261006013755",
+      "name": "host_profile_media_authority"
+    },
+    {
+      "version": "20261006105322",
+      "name": "community_media_authority"
+    },
+    {
+      "version": "20261006133015",
+      "name": "admin_chat_canonical_recency"
+    },
+    {
+      "version": "20261006180321",
+      "name": "community_freeze_safeupdate"
+    },
+    {
+      "version": "20261007024725",
+      "name": "admin_chat_monitor_canonical_recency"
+    },
+    {
+      "version": "20261007061059",
+      "name": "solo_refund_provider_ledger_reconciliation"
+    },
+    {
+      "version": "20261009035059",
+      "name": "targeted_nicepay_ab_closeout"
+    }
+  ],
+  "functions": [
+    {
+      "schema_name": "private",
+      "function_name": "journal_targeted_card_state",
+      "identity_arguments": "",
+      "body_md5": "d75ba271da52767a42db42a203021f34",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": false
+    },
+    {
+      "schema_name": "private",
+      "function_name": "record_targeted_card_approval",
+      "identity_arguments": "p_booking_id text, p_tid text, p_amount integer, p_proof jsonb, p_kind text",
+      "body_md5": "e6e89f6e8fa50de39e821b60a3a5fdbd",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": false
+    },
+    {
+      "schema_name": "public",
+      "function_name": "acknowledge_targeted_card_recovery_atomic",
+      "identity_arguments": "p_operation_id uuid, p_owner_reference text, p_case_reference text",
+      "body_md5": "7a248aaf5dd4a5351bd6319a3105a178",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "begin_targeted_card_refund_atomic",
+      "identity_arguments": "p_operation_id uuid",
+      "body_md5": "fdecc60e7c7134485dc8d266818d87b1",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "close_targeted_card_attempts_atomic",
+      "identity_arguments": "p_actor_reference text, p_c_fingerprint text, p_evidence jsonb",
+      "body_md5": "c8464460dc882e2dc78588305c82b87f",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "close_targeted_card_attempts_risk_acceptance_v2_atomic",
+      "identity_arguments": "p_actor_reference text, p_c_fingerprint text, p_evidence jsonb",
+      "body_md5": "cba8814a2cf017d66deafa7bd58da445",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "confirm_experience_payment_atomic",
+      "identity_arguments": "p_booking_id text, p_provider text, p_provider_reference text, p_provider_transaction_id text, p_verified_amount integer",
+      "body_md5": "40fa202a821fa33e8ba5a56b2a52c18a",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "finalize_targeted_card_refund_atomic",
+      "identity_arguments": "p_operation_id uuid",
+      "body_md5": "139bc92a94aa30f5ed6080049cd7f638",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "get_targeted_card_ops_snapshot",
+      "identity_arguments": "",
+      "body_md5": "2e7c8bc22bc5f35f011ddfb436f1f66d",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "get_targeted_card_recovery_review",
+      "identity_arguments": "",
+      "body_md5": "c216ad31d94da2ef45e309f9f07a1c18",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "record_targeted_card_approval_atomic",
+      "identity_arguments": "p_booking_id text, p_tid text, p_amount integer, p_proof jsonb, p_kind text",
+      "body_md5": "b686985ccb46fd1438e65ca14bef5f0d",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "record_targeted_card_notification_atomic",
+      "identity_arguments": "p_booking_id text, p_tid text, p_amount integer, p_payload jsonb",
+      "body_md5": "27843bb583289adf97b6d72a272635cc",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "record_targeted_card_refund_result_atomic",
+      "identity_arguments": "p_operation_id uuid, p_outcome text, p_proof jsonb",
+      "body_md5": "6d0e8931810c9d39105e7efec857d4de",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "schema_name": "public",
+      "function_name": "review_targeted_card_notifications_atomic",
+      "identity_arguments": "p_booking_id text, p_through_version bigint, p_owner_reference text, p_case_reference text",
+      "body_md5": "f9c3fea8d537ad08ee7b177a62e5cd91",
+      "security_definer": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "owner": "postgres",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "docs/financial/installed/20261009035059_targeted_nicepay_ab_closeout.sql",
+      "sha256": "be1df53834cda17b362d7f24a01b035ec1c5c00c5cb5ff278c2ef8287e93fb90"
+    },
+    {
+      "path": "docs/financial/phase1-installed-v2-review.sql",
+      "sha256": "573bf194564b6c00bb2f57eb0494aaed298be59fc01276a975fc0653f3925f38"
+    }
+  ],
+  "runtimeWorker": "9c181ab0-84db-400f-9121-755970a6bcae",
+  "runtimeArtifactSHA256": "7760ac58843c5f134797c21de2ee1b6874c47ea6475c2a0f55ded6ea475f25a5",
+  "productionMutations": 0
+}

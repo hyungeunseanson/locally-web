@@ -83,7 +83,23 @@ function readMonitorState(details: unknown): OpsAnomalyMonitorState {
       }
     }
   }
-  return { activeDiagnostics: [...new Set(activeDiagnostics)], alertedAtByCode };
+  const versions = record.financial_event_version_by_code;
+  const financialEventVersionByCode: NonNullable<OpsAnomalyMonitorState['financialEventVersionByCode']> = {};
+  if (versions && typeof versions === 'object' && !Array.isArray(versions)) {
+    for (const code of ['targeted_card_recovery_a','targeted_card_recovery_b'] as const) {
+      const version = (versions as Record<string, unknown>)[code];
+      if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0) financialEventVersionByCode[code] = version;
+    }
+  }
+  const notificationEventVersionByCode: NonNullable<OpsAnomalyMonitorState['notificationEventVersionByCode']> = {};
+  const notificationVersions = record.notification_event_version_by_code;
+  if (notificationVersions && typeof notificationVersions === 'object' && !Array.isArray(notificationVersions)) {
+    for (const code of ['targeted_card_notification_a','targeted_card_notification_b'] as const) {
+      const version = (notificationVersions as Record<string, unknown>)[code];
+      if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0) notificationEventVersionByCode[code] = version;
+    }
+  }
+  return { activeDiagnostics: [...new Set(activeDiagnostics)], alertedAtByCode, financialEventVersionByCode, notificationEventVersionByCode };
 }
 
 async function loadPreviousState(supabaseAdmin: SupabaseClient) {
@@ -110,6 +126,8 @@ export function planOpsAnomalyNotifications(params: {
   const emailDiagnostics: OpsAnomalyDiagnosticCode[] = [];
   const nextAlertedAtByCode: OpsAnomalyMonitorState['alertedAtByCode'] = {};
 
+  const nextFinancialVersions: NonNullable<OpsAnomalyMonitorState['financialEventVersionByCode']> = {};
+  const nextNotificationVersions: NonNullable<OpsAnomalyMonitorState['notificationEventVersionByCode']> = {};
   for (const anomaly of params.anomalies) {
     const priorAlertedAt = params.previousState.alertedAtByCode[anomaly.diagnosticCode];
     const elapsed = priorAlertedAt
@@ -117,7 +135,20 @@ export function planOpsAnomalyNotifications(params: {
       : Number.POSITIVE_INFINITY;
     const firstObservation = !previousActive.has(anomaly.diagnosticCode);
     const criticalCooldownElapsed = anomaly.severity === 'critical' && elapsed >= cooldownMs;
-    const shouldAlert = anomaly.severity !== 'info' && (firstObservation || criticalCooldownElapsed);
+    const targeted = anomaly.diagnosticCode === 'targeted_card_recovery_a' || anomaly.diagnosticCode === 'targeted_card_recovery_b';
+    const version = anomaly.aggregateDetails.incident_version;
+    const newFinancialEvent = targeted && version > 0
+      && params.previousState.financialEventVersionByCode?.[anomaly.diagnosticCode] !== version;
+    if (targeted && Number.isSafeInteger(version) && version > 0) nextFinancialVersions[anomaly.diagnosticCode] = version;
+    const inbox = anomaly.diagnosticCode === 'targeted_card_notification_a' || anomaly.diagnosticCode === 'targeted_card_notification_b';
+    const noticeVersion = anomaly.aggregateDetails.notice_version;
+    // Attacker-generated new envelopes cannot cause alert/email storms. New
+    // notices are retained in the snapshot; outstanding review reminds hourly.
+    const noticeCooldownElapsed = inbox && elapsed >= OPS_ANOMALY_THRESHOLDS.notificationRealertCooldownMinutes * 60_000;
+    if (inbox && Number.isSafeInteger(noticeVersion) && noticeVersion > 0) nextNotificationVersions[anomaly.diagnosticCode] = noticeVersion;
+    const newCapacityEvent = inbox && anomaly.aggregateDetails.capacity_exhausted === 1
+      && params.previousState.notificationEventVersionByCode?.[anomaly.diagnosticCode] !== noticeVersion;
+    const shouldAlert = anomaly.severity !== 'info' && (firstObservation || criticalCooldownElapsed || newFinancialEvent || noticeCooldownElapsed || newCapacityEvent);
 
     if (shouldAlert) {
       alertDiagnostics.push(anomaly.diagnosticCode);
@@ -136,6 +167,8 @@ export function planOpsAnomalyNotifications(params: {
     nextState: {
       activeDiagnostics: params.anomalies.map((anomaly) => anomaly.diagnosticCode),
       alertedAtByCode: nextAlertedAtByCode,
+      ...(Object.keys(nextNotificationVersions).length ? { notificationEventVersionByCode: nextNotificationVersions } : {}),
+      ...(Object.keys(nextFinancialVersions).length ? { financialEventVersionByCode: nextFinancialVersions } : {}),
     } satisfies OpsAnomalyMonitorState,
   };
 }
@@ -151,9 +184,14 @@ function buildNotificationCopy(anomaly: OpsAnomaly, observedAt: Date) {
   const definition = OPS_ANOMALY_DEFINITIONS[anomaly.diagnosticCode];
   const ageMinutes = oldestAgeMinutes(observedAt, anomaly.oldestObservedAt);
   const ageText = ageMinutes == null ? '최초 시각 확인 필요' : `가장 오래된 신호 ${ageMinutes}분`;
+  const targeted = anomaly.diagnosticCode === 'targeted_card_recovery_a' || anomaly.diagnosticCode === 'targeted_card_recovery_b';
+  const financeDetails = targeted ? ' 상태: ' + ['review_required','verified','dispatching','unknown','accepted','unassigned']
+    .map(key => `${key}=${anomaly.aggregateDetails[key] || 0}`).join(', ') + '. 담당자 확인은 해결 처리가 아닙니다. 보안 운영 콘솔의 get_targeted_card_recovery_review로 대조하세요.' : '';
+  const inbox = anomaly.diagnosticCode === 'targeted_card_notification_a' || anomaly.diagnosticCode === 'targeted_card_notification_b';
+  const inboxDetails = inbox ? ` 미검증 통보이며 금융 사고 확정이나 환불 권한이 아닙니다. 미검토=${anomaly.aggregateDetails.unreviewed || 0}, 저장=${anomaly.aggregateDetails.stored || 0}/512, 한도초과=${anomaly.aggregateDetails.capacity_exhausted || 0}. 보안 운영 콘솔에서 통보 원문을 대조하고 정확한 검토 버전을 기록하세요. 알림 읽기는 검토 완료가 아닙니다.` : '';
   return {
     title: `[${anomaly.severity.toUpperCase()}] ${definition.title}`,
-    message: `${definition.title}: ${anomaly.count}건 · ${ageText}. 운영 대시보드에서 확인해 주세요.`,
+    message: `${definition.title}: ${anomaly.count}건 · ${ageText}. 운영 대시보드에서 확인해 주세요.${financeDetails}${inboxDetails}`,
     link: '/admin/dashboard?tab=ALERTS',
   };
 }
@@ -263,6 +301,8 @@ export async function runOpsAnomalyMonitor(params: {
       details: {
         active_diagnostics: plan.nextState.activeDiagnostics,
         alerted_at_by_code: plan.nextState.alertedAtByCode,
+        financial_event_version_by_code: plan.nextState.financialEventVersionByCode ?? {},
+        notification_event_version_by_code: plan.nextState.notificationEventVersionByCode ?? {},
         diagnostic_count: diagnosticCount,
         severity_counts: counts,
         alert_count: alertCount,
