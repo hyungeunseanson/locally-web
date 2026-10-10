@@ -50,7 +50,7 @@ await build({
       `export function createAdminClient(){return globalThis.__soloRouteDb;}
        export async function createClient(){return {auth:{getUser:async()=>({data:{user:globalThis.__soloRouteUser},error:null})}};}
        export async function resolveAdminAccess(_db,user){return {isAdmin:user.userId==='44444444-4444-4444-8444-444444444444'};}
-       export function revalidatePath(){} export async function recordAuditLog(){} export async function insertAdminAlerts(){}
+       export function revalidatePath(){} export async function recordAuditLog(){} export async function insertAdminAlerts(){} export async function sendAdminAlertEmails(){}
        export async function sendAdminPaymentConfirmedEmail(){throw new Error('External email forbidden in test');}
        export async function sendImmediateGenericEmail(){} export function captureServerException(){}
        export async function buildLocalizedNotificationInsert(x){return {user_id:x.userId,type:x.type,title:'Synthetic',message:'Synthetic',link:x.link,is_read:false};}
