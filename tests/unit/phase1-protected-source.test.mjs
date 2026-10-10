@@ -12,7 +12,7 @@ const originals = [
   },
   {
     "path": "app/api/payment/experienceCardConfirmation.ts",
-    "sha256": "9aca54612b9ede006bfa44bce8933bc1fc2051e698447bc49f932a92c6a09b95"
+    "sha256": "7cf3ef9d7a7a08a963b6569b8f4ee947429485293b6af7025ca644b9cc8fab11"
   },
   {
     "path": "app/utils/opsAnomalyMonitor/checks.ts",

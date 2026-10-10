@@ -220,13 +220,13 @@ export async function finalizeExperienceCardPayment(params: {
       verifiedAmount: params.verificationResult.approvedAmount,
     });
 
-    if (params.verificationResult.provider === 'nicepay') {
-      await markNicePayConfirmed({
-        client: params.supabaseAdmin, bookingId: params.originalBooking.id,
-        tid: params.verificationResult.providerTransactionId,
-      });
-    }
     if (confirmation.outcome === 'already_processed') {
+      if (params.verificationResult.provider === 'nicepay') {
+        await markNicePayConfirmed({
+          client: params.supabaseAdmin, bookingId: params.originalBooking.id,
+          tid: params.verificationResult.providerTransactionId,
+        });
+      }
       return { success: true, alreadyProcessed: true };
     }
 
@@ -235,6 +235,12 @@ export async function finalizeExperienceCardPayment(params: {
       booking: confirmation.booking,
       paymentMethod: 'card',
     });
+    if (params.verificationResult.provider === 'nicepay') {
+      await markNicePayConfirmed({
+        client: params.supabaseAdmin, bookingId: params.originalBooking.id,
+        tid: params.verificationResult.providerTransactionId,
+      });
+    }
     return { success: true };
   } catch (error) {
     const releasedAfterConfirmationRace = await reconcileExplicitReleasedNicePayApproval(params);
