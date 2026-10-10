@@ -3,14 +3,16 @@ import test from 'node:test';
 import { readFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 const hash = (s,algorithm='sha256') => createHash(algorithm).update(s).digest('hex');
+// PHASE 2 extends three payment entrypoints. Keep their reviewed bytes pinned here;
+// installed PHASE 1 SQL, targeted helpers, and the negative ACL controls remain pinned below.
 const originals = [
   {
     "path": "app/api/payment/cardNotificationHandler.ts",
-    "sha256": "84320bbc7cc69155d9ea1ed370f062b07bf9467da02dd669aa38f5f14d7a0611"
+    "sha256": "25c0ef4acf466a9268c5be4cffadd2acc881d2adaf8c8c14da9429138128500d"
   },
   {
     "path": "app/api/payment/experienceCardConfirmation.ts",
-    "sha256": "bb0214714361ad350a3aa244efc3508b4d69354f6256079795957ff5d1345896"
+    "sha256": "9aca54612b9ede006bfa44bce8933bc1fc2051e698447bc49f932a92c6a09b95"
   },
   {
     "path": "app/utils/opsAnomalyMonitor/checks.ts",
@@ -30,7 +32,7 @@ const originals = [
   },
   {
     "path": "app/utils/payments/card/server.ts",
-    "sha256": "20283c3691114e211c24ec4549edd1c7673b76be6bb3f402968adcc56e9159b2"
+    "sha256": "4aabf43f91cb75fbec23eb964fd99d7451c9276f335a70584e80e7ebc194ddf7"
   },
   {
     "path": "app/utils/payments/card/targetedCloseoutTargets.ts",
