@@ -160,8 +160,8 @@ export const PUBLIC_EXPERIENCE_CARD_IMAGES = {
     largeKey: "cards/experience-4837-primary-4fdd92d1d2b8-w640-q65.webp",
   },
   "4838": {
-    originUrl: "https://media-canary.locally-travel.com/originals/v1/7e/7e7c847fc72ed80f54582284eaf5fe6df88c5d84d920c92d51caec4de771e6a8/8882fce974efe5b63f792cc8c749b8b0556d53c9ac0764d308f4ccbe3dd2d92b.jpg?legacy=26ea1dbbc16f",
-    smallKey: "cards/experience-4838-primary-26ea1dbbc16f-w384-q65.webp",
-    largeKey: "cards/experience-4838-primary-26ea1dbbc16f-w640-q65.webp",
+    originUrl: "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/300445db-ee2f-4a88-b50b-e0590ea1dafc/hero.jpg",
+    smallKey: "cards/experience-4838-primary-48be879bf71b-w384-q65.webp",
+    largeKey: "cards/experience-4838-primary-48be879bf71b-w640-q65.webp",
   },
 } as const;

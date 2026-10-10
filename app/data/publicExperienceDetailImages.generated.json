@@ -1359,20 +1359,45 @@
     }
   },
   "4838": {
-    "https://media-canary.locally-travel.com/originals/v1/7e/7e7c847fc72ed80f54582284eaf5fe6df88c5d84d920c92d51caec4de771e6a8/8882fce974efe5b63f792cc8c749b8b0556d53c9ac0764d308f4ccbe3dd2d92b.jpg?legacy=26ea1dbbc16f": {
-      "smallKey": "details/experience-4838-26ea1dbbc16f-w480-q75.webp",
-      "mediumKey": "details/experience-4838-26ea1dbbc16f-w960-q75.webp",
-      "largeKey": "details/experience-4838-26ea1dbbc16f-w1440-q75.webp"
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/300445db-ee2f-4a88-b50b-e0590ea1dafc/hero.jpg": {
+      "smallKey": "details/experience-4838-48be879bf71b-w480-q75.webp",
+      "mediumKey": "details/experience-4838-48be879bf71b-w960-q75.webp",
+      "largeKey": "details/experience-4838-48be879bf71b-w1440-q75.webp"
     },
-    "https://media-canary.locally-travel.com/originals/v1/ac/acd09b77df94aead274ecc49b29d43f054d370eb4c0dbcf90f57e2d0fe1caa93/52e449ecd9b77672cc8312f24ae74a6c2dc859999b40c2becfd0a938ae068f26.jpg?legacy=2cfa5baaa8f6": {
-      "smallKey": "details/experience-4838-2cfa5baaa8f6-w480-q75.webp",
-      "mediumKey": "details/experience-4838-2cfa5baaa8f6-w960-q75.webp",
-      "largeKey": "details/experience-4838-2cfa5baaa8f6-w1440-q75.webp"
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/7e79fe1b-fe17-412b-af64-6770cb87de48/hero.jpg": {
+      "smallKey": "details/experience-4838-be8e661cadad-w480-q75.webp",
+      "mediumKey": "details/experience-4838-be8e661cadad-w960-q75.webp",
+      "largeKey": "details/experience-4838-be8e661cadad-w1440-q75.webp"
     },
-    "https://media-canary.locally-travel.com/originals/v1/82/828f7b12ba1797c89295747d508b6752eb2d6d9f9f6a90d878d14b2cf0fdb373/f8b769f034f6c78f81b4b3217c1b6a6abcdcc27f91a2e5252a22d282417fe563.jpg?legacy=f46b56be8704": {
-      "smallKey": "details/experience-4838-f46b56be8704-w480-q75.webp",
-      "mediumKey": "details/experience-4838-f46b56be8704-w960-q75.webp",
-      "largeKey": "details/experience-4838-f46b56be8704-w1440-q75.webp"
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/e458d560-65e8-4516-80c2-bd20d9bb12c1/hero.jpg": {
+      "smallKey": "details/experience-4838-c8506f040099-w480-q75.webp",
+      "mediumKey": "details/experience-4838-c8506f040099-w960-q75.webp",
+      "largeKey": "details/experience-4838-c8506f040099-w1440-q75.webp"
+    },
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/b7d0a63c-6291-49ff-ab04-e9d8ebb74d1a/hero.jpg": {
+      "smallKey": "details/experience-4838-839fe8d37293-w480-q75.webp",
+      "mediumKey": "details/experience-4838-839fe8d37293-w960-q75.webp",
+      "largeKey": "details/experience-4838-839fe8d37293-w1440-q75.webp"
+    },
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/32784ee6-2825-4c06-ab32-2c4b458a8395/itinerary.jpg": {
+      "smallKey": "details/experience-4838-e8942f6fe4aa-w480-q75.webp",
+      "mediumKey": "details/experience-4838-e8942f6fe4aa-w960-q75.webp",
+      "largeKey": "details/experience-4838-e8942f6fe4aa-w1440-q75.webp"
+    },
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/12b862a0-b5b2-4639-b246-fff39551b7b2/itinerary.jpg": {
+      "smallKey": "details/experience-4838-6698a9d32cb0-w480-q75.webp",
+      "mediumKey": "details/experience-4838-6698a9d32cb0-w960-q75.webp",
+      "largeKey": "details/experience-4838-6698a9d32cb0-w1440-q75.webp"
+    },
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/7dafdf7f-f060-4dc3-9ed5-8319aa244c7c/itinerary.jpg": {
+      "smallKey": "details/experience-4838-1ea7a2511926-w480-q75.webp",
+      "mediumKey": "details/experience-4838-1ea7a2511926-w960-q75.webp",
+      "largeKey": "details/experience-4838-1ea7a2511926-w1440-q75.webp"
+    },
+    "https://media-canary.locally-travel.com/sources/v1/experience/13ac42251696a51d525ccbfbde42f29c2df45f6372963c94d82e23323e0ec14d/c24c23e9-6838-4728-8e49-7f0237ab9353/itinerary.jpg": {
+      "smallKey": "details/experience-4838-e8d3ee1b9725-w480-q75.webp",
+      "mediumKey": "details/experience-4838-e8d3ee1b9725-w960-q75.webp",
+      "largeKey": "details/experience-4838-e8d3ee1b9725-w1440-q75.webp"
     }
   }
 }
