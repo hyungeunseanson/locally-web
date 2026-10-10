@@ -54,7 +54,7 @@ alert claims, retention and popularity. Real email/NICEPAY/DLQ delivery and full
 positive customer journeys are NOT claimed by these Cron probes.
 
 Covered boundaries include normal commit, pre-write loss/expired processing,
-legacy partial-write loss, injected receipt failure and full rollback, leased
+legacy partial-write loss, injected AFTER UPDATE failure after task/job writes and full rollback, leased
 and processing expiry, duplicate delivery/finalization, old/new transitions in
 both directions, late AI results, provider-outcome loss, ACK loss, source version,
 manual fields, cancellation races, sibling locale/job aggregate, backoff,

@@ -189,21 +189,24 @@ BEGIN
  RETURN true;
 END $$;
 
--- Retain both public overload contracts; private originals retain provider limits.
-ALTER FUNCTION public.lease_experience_translation_task(text,timestamptz,integer,integer) SET SCHEMA private;
-ALTER FUNCTION public.lease_experience_translation_task(text,timestamptz,integer) SET SCHEMA private;
+-- Keep public OIDs, dependencies and overload contracts. Clone the checked
+-- provider-limit implementations privately, then replace the public bodies.
 -- Add per-experience serialization to both captured existing implementations.
 DO $$ DECLARE p record; d text;
 BEGIN
- FOR p IN SELECT oid FROM pg_proc WHERE pronamespace='private'::regnamespace AND proname='lease_experience_translation_task' LOOP
+ FOR p IN SELECT oid,oidvectortypes(proargtypes) AS args FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='lease_experience_translation_task' LOOP
   d:=pg_get_functiondef(p.oid);
   d:=replace(d,'AND experience_translation_tasks.not_before <= p_now',
    'AND experience_translation_tasks.not_before <= p_now AND NOT EXISTS (SELECT 1 FROM public.experience_translation_tasks active WHERE active.experience_id=experience_translation_tasks.experience_id AND active.status IN (''leased'',''processing'') AND active.lease_expires_at>clock_timestamp())');
   IF d=pg_get_functiondef(p.oid) THEN RAISE EXCEPTION 'translation_lease_source_contract_changed'; END IF;
+  d:=replace(d,'FUNCTION public.lease_experience_translation_task(', 'FUNCTION private.lease_experience_translation_task(');
+  IF to_regprocedure('private.lease_experience_translation_task('||p.args||')') IS NOT NULL THEN
+   RAISE EXCEPTION 'translation_private_lease_already_exists';
+  END IF;
   EXECUTE d;
  END LOOP;
 END $$;
-CREATE FUNCTION public.lease_experience_translation_task(p_provider text,p_now timestamptz DEFAULT timezone('utc',now()),p_lease_seconds integer DEFAULT 180,p_reserved_tokens integer DEFAULT 0)
+CREATE OR REPLACE FUNCTION public.lease_experience_translation_task(p_provider text,p_now timestamptz DEFAULT timezone('utc',now()),p_lease_seconds integer DEFAULT 180,p_reserved_tokens integer DEFAULT 0)
 RETURNS TABLE(id uuid,job_id uuid,experience_id bigint,translation_version integer,source_locale text,target_locale text,provider text,attempt_count integer,priority integer,lease_expires_at timestamptz)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE leased record; current_version integer;
@@ -220,7 +223,7 @@ BEGIN
  EXCEPTION WHEN lock_not_available THEN RETURN;
  END;
 END $$;
-CREATE FUNCTION public.lease_experience_translation_task(p_provider text,p_now timestamptz DEFAULT timezone('utc',now()),p_lease_seconds integer DEFAULT 180)
+CREATE OR REPLACE FUNCTION public.lease_experience_translation_task(p_provider text,p_now timestamptz DEFAULT timezone('utc',now()),p_lease_seconds integer DEFAULT 180)
 RETURNS TABLE(id uuid,job_id uuid,experience_id bigint,translation_version integer,source_locale text,target_locale text,provider text,attempt_count integer,priority integer,lease_expires_at timestamptz)
 LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
  SELECT * FROM public.lease_experience_translation_task(p_provider,p_now,p_lease_seconds,0)
@@ -231,6 +234,8 @@ REVOKE ALL ON FUNCTION public.finalize_experience_translation_task(uuid,integer,
 GRANT EXECUTE ON FUNCTION public.finalize_experience_translation_task(uuid,integer,timestamptz,jsonb),public.lease_experience_translation_task(text,timestamptz,integer,integer),public.lease_experience_translation_task(text,timestamptz,integer) TO service_role;
 -- Pin ownership rather than inheriting an operator-specific migration owner.
 ALTER TABLE private.translation_completion_receipts OWNER TO postgres;
+ALTER FUNCTION private.lease_experience_translation_task(text,timestamptz,integer,integer) OWNER TO postgres;
+ALTER FUNCTION private.lease_experience_translation_task(text,timestamptz,integer) OWNER TO postgres;
 ALTER FUNCTION private.translation_locale_payload(jsonb,text) OWNER TO postgres;
 ALTER FUNCTION private.translation_sync_job(uuid) OWNER TO postgres;
 ALTER FUNCTION private.translation_terminal_guard() OWNER TO postgres;
@@ -239,4 +244,5 @@ ALTER FUNCTION private.translation_recover_expired() OWNER TO postgres;
 ALTER FUNCTION public.finalize_experience_translation_task(uuid,integer,timestamptz,jsonb) OWNER TO postgres;
 ALTER FUNCTION public.lease_experience_translation_task(text,timestamptz,integer,integer) OWNER TO postgres;
 ALTER FUNCTION public.lease_experience_translation_task(text,timestamptz,integer) OWNER TO postgres;
+NOTIFY pgrst, 'reload schema';
 COMMIT;

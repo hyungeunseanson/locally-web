@@ -1332,7 +1332,7 @@
       "version": "20261010102639",
       "name": "translation_queue_recovery_p1",
       "repositoryFile": "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
-      "repositorySha256": "4daaed60105c4a32575a8de52cd55f77b788b6697c49fb7b46d73d1ea8cae5fc",
+      "repositorySha256": "9452502539c5bed80998e0173c578dd3518e4277208f666e9a128b6f90442a81",
       "status": "approval_required",
       "automaticProductionApply": false
     }

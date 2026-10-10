@@ -221,6 +221,9 @@ try {
   await sql(
     "ALTER TABLE public.experiences ADD COLUMN media_revision bigint NOT NULL DEFAULT 0;CREATE FUNCTION private.bump_experience_media_revision() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$BEGIN NEW.media_revision:=OLD.media_revision+1;RETURN NEW;END$$;CREATE TRIGGER experience_media_revision BEFORE UPDATE ON public.experiences FOR EACH ROW EXECUTE FUNCTION private.bump_experience_media_revision()",
   );
+  const leaseOidsBefore = await sql(
+    "SELECT oid::text,pronargs FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='lease_experience_translation_task' ORDER BY pronargs",
+  );
   const migrationSql = await readFile(
     "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
     "utf8",
@@ -250,6 +253,12 @@ try {
       "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
       "utf8",
     ),
+  );
+  assert.deepEqual(
+    await sql(
+      "SELECT oid::text,pronargs FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='lease_experience_translation_task' ORDER BY pronargs",
+    ),
+    leaseOidsBefore,
   );
   await sql(
     "INSERT INTO public.translation_provider_state(provider,model,max_concurrency,rpm_limit,tpm_limit,window_seconds) VALUES('gemini','fixture',10,1000,100000,60),('grok','fixture',10,1000,100000,60)",
@@ -319,7 +328,7 @@ try {
   await reset();
   t = await lease();
   await sql(
-    "CREATE FUNCTION public.fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'injected';END$$;CREATE TRIGGER fixture_fail BEFORE INSERT ON private.translation_completion_receipts FOR EACH ROW EXECUTE FUNCTION public.fixture_fail()",
+    "CREATE FUNCTION public.fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'injected';END$$;CREATE TRIGGER fixture_fail AFTER UPDATE ON public.experiences FOR EACH ROW EXECUTE FUNCTION public.fixture_fail()",
   );
   r = await finalize(t);
   assert(r.status >= 400);
@@ -329,9 +338,24 @@ try {
   );
   assert.equal((await row(t.id)).status, "leased");
   await sql(
-    "DROP TRIGGER fixture_fail ON private.translation_completion_receipts;DROP FUNCTION public.fixture_fail()",
+    "DROP TRIGGER fixture_fail ON public.experiences;DROP FUNCTION public.fixture_fail()",
   );
-  record("mid-finalization exception rolls back experience/task/job");
+  assert.equal(
+    (await sql("SELECT status FROM public.experience_translation_jobs"))[0]
+      .status,
+    "queued",
+  );
+  assert.equal(
+    (
+      await sql(
+        "SELECT count(*) n FROM private.translation_completion_receipts",
+      )
+    )[0].n,
+    "0",
+  );
+  record(
+    "failure after task/job writes rolls back experience/task/job/receipt",
+  );
   for (const status of ["leased", "processing"]) {
     await reset();
     t = await lease();
