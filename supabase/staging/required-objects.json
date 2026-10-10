@@ -33,18 +33,9 @@
     "supabase/migrations/20261007024725_admin_chat_monitor_canonical_recency.sql",
     "supabase/migrations/20261007052144_solo_refund_provider_ledger_reconciliation.sql",
     "supabase/migrations/20261010113747_translation_queue_recovery_p1.sql",
-    "supabase/migrations/20261011000100_experience_nicepay_recovery.sql"
+    "supabase/migrations/20261010172837_experience_nicepay_recovery.sql"
   ],
-  "pendingProductionMigrations": [
-    {
-      "version": "20261011000100",
-      "name": "experience_nicepay_recovery",
-      "repositoryFile": "supabase/migrations/20261011000100_experience_nicepay_recovery.sql",
-      "repositorySha256": "c48d009c964368e1ab0b6d25cc795b2cce711a01edb1244a305fc65e7f7f5965",
-      "status": "approval_required",
-      "automaticProductionApply": false
-    }
-  ],
+  "pendingProductionMigrations": [],
   "applicationTables": [
     "admin_audit_logs",
     "admin_job_runs",

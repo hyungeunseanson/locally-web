@@ -226,6 +226,14 @@
       "repositorySha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce",
       "repositoryVersion": "20261010113747",
       "ledgerStatementsSha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce"
+    },
+    {
+      "version": "20261010172837",
+      "name": "experience_nicepay_recovery",
+      "repositoryFile": "supabase/migrations/20261010172837_experience_nicepay_recovery.sql",
+      "repositorySha256": "c48d009c964368e1ab0b6d25cc795b2cce711a01edb1244a305fc65e7f7f5965",
+      "repositoryVersion": "20261010172837",
+      "ledgerStatementsSha256": "c48d009c964368e1ab0b6d25cc795b2cce711a01edb1244a305fc65e7f7f5965"
     }
   ],
   "operationalStateDeltas": [
@@ -1335,16 +1343,7 @@
     "resultLimit": 25,
     "lockTimeout": "2s"
   },
-  "pendingProductionMigrations": [
-    {
-      "version": "20261011000100",
-      "name": "experience_nicepay_recovery",
-      "repositoryFile": "supabase/migrations/20261011000100_experience_nicepay_recovery.sql",
-      "repositorySha256": "c48d009c964368e1ab0b6d25cc795b2cce711a01edb1244a305fc65e7f7f5965",
-      "status": "approval_required",
-      "automaticProductionApply": false
-    }
-  ],
+  "pendingProductionMigrations": [],
   "selectiveProductionRollout": {
     "allowedVersions": [
       "20261005104924"

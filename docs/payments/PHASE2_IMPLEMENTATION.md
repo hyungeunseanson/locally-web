@@ -33,7 +33,7 @@
 ## 운영 적용 절차와 출시 Gate
 
 1. PR CI 통과와 코드 리뷰를 확인하고, 배포 직전 GitHub `main` 및 Production Worker의 실제 소스 SHA와 환경 설정을 다시 조회한다. 다른 변경이 생기면 새 소스와 Migration 충돌을 재검증한다.
-2. 운영 DB 백업·복구 지점을 확인한 뒤 `20261011000100_experience_nicepay_recovery.sql`을 먼저 적용한다. 서비스 역할 외 접근 차단, 새 테이블·RPC, 기존 결제·정산 데이터 불변을 확인한다.
+2. 운영 DB 백업·복구 지점을 확인한 뒤 `20261010172837_experience_nicepay_recovery.sql`을 먼저 적용한다. 서비스 역할 외 접근 차단, 새 테이블·RPC, 기존 결제·정산 데이터 불변을 확인한다.
 3. 검증된 PR 소스를 병합한 뒤 Production Worker를 배포한다. 배포 스크립트와 Wrangler의 복구 Cron 기본값은 `true`로 고정했으며, 배포 계약 검사에서 실제 플래그 변화를 확인한다. Canary 격리를 유지한다.
 4. 비금융 합성 점검으로 Worker 버전·트래픽, DB RPC 접근 제어, Cron 실행 기록, 관리자 원장 화면, 12시간 안내를 확인한다. 실제 운영 결제를 테스트 결제로 만들거나 자동 환불하지 않는다.
 5. 실패 시 우선 `NICEPAY_RECOVERY_SCHEDULED_ENABLED=false`로 Cron만 중지하고 원장·이벤트를 보존한다. 필요하면 검증된 이전 Worker를 재배포한다. Migration은 과거 Worker에 영향을 주지 않는 추가 스키마이므로 성급히 삭제하지 않는다. `manual_review` 항목은 NICEPAY 관리자 거래 내역과 DB를 사람이 대조한다.

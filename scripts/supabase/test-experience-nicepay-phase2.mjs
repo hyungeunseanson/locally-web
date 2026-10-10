@@ -62,7 +62,7 @@ try {
   assert.ok(baseSchema, 'local baseline fixture available');
   await db.exec(baseSchema);
   await db.exec(await readFile('supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql', 'utf8'));
-  await db.exec(await readFile('supabase/migrations/20261011000100_experience_nicepay_recovery.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/20261010172837_experience_nicepay_recovery.sql', 'utf8'));
 
   await check('claim and recovery ledger roll back together on partial DB failure', async () => {
     const id = 'ORD-PHASE2-ATOMIC-FAIL'; await booking(id, null);
