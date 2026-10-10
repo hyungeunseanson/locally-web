@@ -60,6 +60,18 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Verify isolated Next SSR image fallback
+        run: npx playwright test -c playwright.image-canary-fixture.config.ts
+
+      - name: Preserve isolated image fallback traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-canary-traces
+          path: test-results/image-canary
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Verify admin guest review access and 390px review quality UI
         run: npx playwright test -c playwright.contracts.config.ts tests/e2e/269-admin-guest-review-quality.spec.ts --project=chromium --workers=1 --reporter=line
 

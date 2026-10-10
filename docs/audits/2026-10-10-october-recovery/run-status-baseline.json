@@ -1,0 +1,821 @@
+{
+  "checkedAt": "2026-10-10T08:41:10.081Z",
+  "baselineMain": "2848fcd0f635582a94ad18b430f98087200bbbca",
+  "uniqueFailureNotifications": 57,
+  "rawCategoryCount": 19,
+  "groupedDiagnosisCount": 10,
+  "rows": [
+    {
+      "id": 36766949219,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "d211726b3bb831e3658357edb13bc1a1a5a25bc8",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "d211726b3bb831e3658357edb13bc1a1a5a25bc8",
+      "updated": "2026-09-30T19:42:59Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 36857913007,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "b641099fd7837be149456c16fb627f5b4e498b04",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "b641099fd7837be149456c16fb627f5b4e498b04",
+      "updated": "2026-10-01T11:56:44Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 36900947296,
+      "category": "LINT_TEST_HARNESS",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/36955154362",
+      "sha": "c2c9f85d454bc2c3ef91fe76583647a973611fd6",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "c2c9f85d454bc2c3ef91fe76583647a973611fd6",
+      "updated": "2026-10-01T17:40:31Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 36917037546,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "c65f2ebb98218458097c287053041e7f0137b398",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "c65f2ebb98218458097c287053041e7f0137b398",
+      "updated": "2026-10-01T19:53:50Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 36954365274,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/36955154362",
+      "sha": "1d5537aafaedf29ffcf47849ed3e9fdb92d9bf51",
+      "attempt": 2,
+      "conclusion": "failure",
+      "head": "1d5537aafaedf29ffcf47849ed3e9fdb92d9bf51",
+      "updated": "2026-10-02T02:15:43Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37000544514,
+      "category": "LINT_TEST_HARNESS",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37003407543",
+      "sha": "048606ea7d6a2413d2800bbf72e586bca7e67fc0",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "048606ea7d6a2413d2800bbf72e586bca7e67fc0",
+      "updated": "2026-10-02T11:22:46Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37000544524,
+      "category": "CHAT_UI_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37003407589",
+      "sha": "048606ea7d6a2413d2800bbf72e586bca7e67fc0",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "048606ea7d6a2413d2800bbf72e586bca7e67fc0",
+      "updated": "2026-10-02T11:24:30Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37000659710,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "da69a033cdc9668b16e05eb1c3f52b812efdba68",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "da69a033cdc9668b16e05eb1c3f52b812efdba68",
+      "updated": "2026-10-02T11:26:34Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37002683480,
+      "category": "CHAT_UI_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37003407589",
+      "sha": "a7fd7c1bb7aa327303a853dd65a3c265d9e355bb",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a7fd7c1bb7aa327303a853dd65a3c265d9e355bb",
+      "updated": "2026-10-02T11:48:32Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37003867120,
+      "category": "QUEUE_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37009619412",
+      "sha": "5d2f2c815d45b7f82bd70f3e8bb4b4ba05f690fe",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "5d2f2c815d45b7f82bd70f3e8bb4b4ba05f690fe",
+      "updated": "2026-10-02T12:04:24Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37022305756,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37084983395",
+      "sha": "3eb1c351ca05b7e9cc1f76d382e5f00e65ebb520",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3eb1c351ca05b7e9cc1f76d382e5f00e65ebb520",
+      "updated": "2026-10-02T14:58:17Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37054571616,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "0729af24f4ce0f6eef275461bc98ba88ff24e854",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "0729af24f4ce0f6eef275461bc98ba88ff24e854",
+      "updated": "2026-10-02T19:35:50Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37105140733,
+      "category": "ANONYMOUS_ASSET_COOKIE_CONTRACT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37105907938",
+      "sha": "c0b481f8b76bfe163e0c684ae15eaf6b9f4a922f",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "c0b481f8b76bfe163e0c684ae15eaf6b9f4a922f",
+      "updated": "2026-10-03T07:10:48Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37105499802,
+      "category": "ANONYMOUS_ASSET_COOKIE_CONTRACT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37105907938",
+      "sha": "2ef674f5dd9568063c80a8cdbf9a4ec0bb74108c",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "2ef674f5dd9568063c80a8cdbf9a4ec0bb74108c",
+      "updated": "2026-10-03T07:17:13Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37105907938,
+      "category": "INFRA_ECR_RATE_LIMIT",
+      "resolution": "동일 run 재시도 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37105907938",
+      "sha": "da3774c745872caf69e44bbc29f7ca89e0daf313",
+      "attempt": 2,
+      "conclusion": "success",
+      "head": "da3774c745872caf69e44bbc29f7ca89e0daf313",
+      "updated": "2026-10-03T07:33:25Z",
+      "currentState": "SAME_RUN_RETRY_SUCCESS"
+    },
+    {
+      "id": 37117165889,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "85d3838f83a7f080fbf1f1d609c9a651e0ad09e7",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "85d3838f83a7f080fbf1f1d609c9a651e0ad09e7",
+      "updated": "2026-10-03T10:43:56Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37123955034,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37126087427",
+      "sha": "b789d33cfa2d234440234b701e9e1c4f8427ee11",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "b789d33cfa2d234440234b701e9e1c4f8427ee11",
+      "updated": "2026-10-03T12:51:52Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37125206715,
+      "category": "CHAT_UI_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37126087448",
+      "sha": "9b00d9a496735c2f3d947d320f1067a6e9274d83",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "9b00d9a496735c2f3d947d320f1067a6e9274d83",
+      "updated": "2026-10-03T13:12:51Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37143532542,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "b842b68e4a6f8f261af9a35554c6d7a2ad76568d",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "b842b68e4a6f8f261af9a35554c6d7a2ad76568d",
+      "updated": "2026-10-03T18:21:20Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37172604011,
+      "category": "BROWSER_TEARDOWN_CONTRACT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37173266378",
+      "sha": "da43b68b8a3cd6de5089e7ae2374ee91babbcbbc",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "da43b68b8a3cd6de5089e7ae2374ee91babbcbbc",
+      "updated": "2026-10-04T03:06:45Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37183147504,
+      "category": "QUEUE_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37190071190",
+      "sha": "bceca3e86c269f75dc8db01c52805f0ea2d844e0",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "bceca3e86c269f75dc8db01c52805f0ea2d844e0",
+      "updated": "2026-10-04T06:39:40Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37189313689,
+      "category": "CHAT_UI_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37190071196",
+      "sha": "dca9f07e2fc725e9e8721968345f63df7d52bb36",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "dca9f07e2fc725e9e8721968345f63df7d52bb36",
+      "updated": "2026-10-04T08:36:48Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37198381523,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "a732887c0b9fe7778b5b2a925b59c1d5f87f716e",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a732887c0b9fe7778b5b2a925b59c1d5f87f716e",
+      "updated": "2026-10-04T11:24:48Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37198778254,
+      "category": "backup_error",
+      "resolution": "후속 동일 workflow의 새 실행 정상; 과거 snapshot 소급 복구 아님",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/38001478581",
+      "sha": "a732887c0b9fe7778b5b2a925b59c1d5f87f716e",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a732887c0b9fe7778b5b2a925b59c1d5f87f716e",
+      "updated": "2026-10-04T11:46:09Z",
+      "currentState": "LATER_SNAPSHOT_SUCCESS"
+    },
+    {
+      "id": 37214894208,
+      "category": "storage_backup_operator_failed",
+      "resolution": "후속 동일 workflow의 새 실행 정상; 과거 snapshot 소급 복구 아님",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/38001478581",
+      "sha": "84d376cc505449a31985ac51445dfa771e426e5d",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "84d376cc505449a31985ac51445dfa771e426e5d",
+      "updated": "2026-10-04T16:43:49Z",
+      "currentState": "LATER_SNAPSHOT_SUCCESS"
+    },
+    {
+      "id": 37224123104,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "3963ab0a7e455b4e6f3ac3006dd103460c932c0d",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3963ab0a7e455b4e6f3ac3006dd103460c932c0d",
+      "updated": "2026-10-04T18:26:14Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37247549965,
+      "category": "destination_provider_validation_failed",
+      "resolution": "후속 동일 workflow의 새 실행 정상; 과거 snapshot 소급 복구 아님",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37250351392",
+      "sha": "3963ab0a7e455b4e6f3ac3006dd103460c932c0d",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3963ab0a7e455b4e6f3ac3006dd103460c932c0d",
+      "updated": "2026-10-05T00:27:07Z",
+      "currentState": "LATER_SNAPSHOT_SUCCESS"
+    },
+    {
+      "id": 37286865262,
+      "category": "IMAGE_ALLOWLIST_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37289526437",
+      "sha": "c21b3efb78acfd73500e68267db16b11053fb25a",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "c21b3efb78acfd73500e68267db16b11053fb25a",
+      "updated": "2026-10-05T09:00:58Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37286865290,
+      "category": "IMAGE_ALLOWLIST_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37289526480",
+      "sha": "c21b3efb78acfd73500e68267db16b11053fb25a",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "c21b3efb78acfd73500e68267db16b11053fb25a",
+      "updated": "2026-10-05T09:02:50Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37287567512,
+      "category": "ENV_MANIFEST_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37289526480",
+      "sha": "12be4edc5739bc4d35e36dd6590398d70f9eec01",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "12be4edc5739bc4d35e36dd6590398d70f9eec01",
+      "updated": "2026-10-05T09:08:05Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37288462633,
+      "category": "UPLOAD_NAMESPACE_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37289526480",
+      "sha": "3941d60139587aedfb28d274d742bbd0e4eda5f1",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3941d60139587aedfb28d274d742bbd0e4eda5f1",
+      "updated": "2026-10-05T09:17:25Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37309529091,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37316338773",
+      "sha": "77acb57400e7e01dc794ee39e26e523a9b145978",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "77acb57400e7e01dc794ee39e26e523a9b145978",
+      "updated": "2026-10-05T12:30:50Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37311385670,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "5fb9c9291c19dba84bcb8358f9a3ba47696d2104",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "5fb9c9291c19dba84bcb8358f9a3ba47696d2104",
+      "updated": "2026-10-05T12:46:16Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37313878405,
+      "category": "WORKER_RUNTIME_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37316338773",
+      "sha": "baeb89715c13324089b578c061a583ced8aa27ff",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "baeb89715c13324089b578c061a583ced8aa27ff",
+      "updated": "2026-10-05T13:16:03Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37377135072,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "1cbb604b4298e7936e53c5f5a9563dce9a17ecd5",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "1cbb604b4298e7936e53c5f5a9563dce9a17ecd5",
+      "updated": "2026-10-05T21:43:09Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37408371184,
+      "category": "IMAGE_ALLOWLIST_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37411013663",
+      "sha": "76cdf9650f1f0723526d795c28024a49680258ca",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "76cdf9650f1f0723526d795c28024a49680258ca",
+      "updated": "2026-10-06T03:23:52Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37408866317,
+      "category": "UPLOAD_NAMESPACE_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37411013663",
+      "sha": "5e0bb0c0cc5a9f6bac6ce31734b2798afb31875e",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "5e0bb0c0cc5a9f6bac6ce31734b2798afb31875e",
+      "updated": "2026-10-06T03:30:12Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37409453403,
+      "category": "CI_FIXTURE_DEPENDENCY",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37411013663",
+      "sha": "7471f3bba171ac4edddd7e2e8beb154eaec6353a",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "7471f3bba171ac4edddd7e2e8beb154eaec6353a",
+      "updated": "2026-10-06T03:37:58Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37457397407,
+      "category": "IMAGE_ALLOWLIST_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "b9060121bb0fa878336d7fbdb22bdbedd4577ccb",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "b9060121bb0fa878336d7fbdb22bdbedd4577ccb",
+      "updated": "2026-10-06T11:39:48Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37457971998,
+      "category": "IMAGE_ALLOWLIST_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "fe74b5c17e78776fb47596cae0522909c83dce42",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "fe74b5c17e78776fb47596cae0522909c83dce42",
+      "updated": "2026-10-06T11:45:40Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37459537530,
+      "category": "ENV_MANIFEST_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "ae7b6f6ae226fe43eabc782ad392f0d58734e523",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "ae7b6f6ae226fe43eabc782ad392f0d58734e523",
+      "updated": "2026-10-06T11:59:18Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37461546661,
+      "category": "ENV_MANIFEST_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "1e49f416e8042b07774bd594e3ebe66625243ec7",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "1e49f416e8042b07774bd594e3ebe66625243ec7",
+      "updated": "2026-10-06T12:17:00Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37461852132,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "a616af1c393f960b093a3aee7ae4e21fb5601738",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a616af1c393f960b093a3aee7ae4e21fb5601738",
+      "updated": "2026-10-06T12:20:49Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37462713227,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "f45590255bb5ef099dabd36af1498d8555872e85",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "f45590255bb5ef099dabd36af1498d8555872e85",
+      "updated": "2026-10-06T12:26:56Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37465276070,
+      "category": "INFRA_ECR_RATE_LIMIT",
+      "resolution": "동일 run 재시도 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37465276070",
+      "sha": "926961a853e56731500d3e975353c5a2a7d19e7a",
+      "attempt": 2,
+      "conclusion": "success",
+      "head": "926961a853e56731500d3e975353c5a2a7d19e7a",
+      "updated": "2026-10-06T12:54:53Z",
+      "currentState": "SAME_RUN_RETRY_SUCCESS"
+    },
+    {
+      "id": 37489973174,
+      "category": "CHAT_UI_ASSERTION",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37491456906",
+      "sha": "a448ab3ad97abc02c6b8b160eac663d79827a9de",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a448ab3ad97abc02c6b8b160eac663d79827a9de",
+      "updated": "2026-10-06T15:51:37Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37521704097,
+      "category": "host_inventory_safety_boundary",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "e6d63e2073a2876a80036b67752aea3c2cd0c9da",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "e6d63e2073a2876a80036b67752aea3c2cd0c9da",
+      "updated": "2026-10-06T19:49:29Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37542676189,
+      "category": "source_drift",
+      "resolution": "후속 동일 workflow의 새 실행 정상; 과거 snapshot 소급 복구 아님",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/38001478581",
+      "sha": "e6d63e2073a2876a80036b67752aea3c2cd0c9da",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "e6d63e2073a2876a80036b67752aea3c2cd0c9da",
+      "updated": "2026-10-07T00:33:50Z",
+      "currentState": "LATER_SNAPSHOT_SUCCESS"
+    },
+    {
+      "id": 37618308872,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "3eda49f5f887e5a3d8023dff0496996651c3a170",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3eda49f5f887e5a3d8023dff0496996651c3a170",
+      "updated": "2026-10-07T12:09:25Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37679807070,
+      "category": "host_inventory_safety_boundary",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "3eda49f5f887e5a3d8023dff0496996651c3a170",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "3eda49f5f887e5a3d8023dff0496996651c3a170",
+      "updated": "2026-10-07T20:09:13Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37775598574,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "a10062e7405591d80c6ee52349ed762d401d6daa",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "a10062e7405591d80c6ee52349ed762d401d6daa",
+      "updated": "2026-10-08T12:21:25Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37837086115,
+      "category": "host_inventory_safety_boundary",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "e4933ce1c00707b792e69911a0791726a6a7e956",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "e4933ce1c00707b792e69911a0791726a6a7e956",
+      "updated": "2026-10-08T20:07:50Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37883086685,
+      "category": "BROWSER_CACHE_CONTRACT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/37884009377",
+      "sha": "e6e63ee707d11ecc2746181e02d23928ce815497",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "e6e63ee707d11ecc2746181e02d23928ce815497",
+      "updated": "2026-10-09T04:22:18Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 37927931818,
+      "category": "canary_fixture_missing",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "77d0d730fb418d68025585bcab8e08a0671ece87",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "77d0d730fb418d68025585bcab8e08a0671ece87",
+      "updated": "2026-10-09T12:11:03Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 37982389457,
+      "category": "host_inventory_safety_boundary",
+      "resolution": "후속 동종 workflow 성공 없음",
+      "proof": "",
+      "sha": "77d0d730fb418d68025585bcab8e08a0671ece87",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "77d0d730fb418d68025585bcab8e08a0671ece87",
+      "updated": "2026-10-09T19:45:45Z",
+      "currentState": "OPEN"
+    },
+    {
+      "id": 38011330822,
+      "category": "MIGRATION_CONTRACT_DRIFT",
+      "resolution": "동일 branch 후속 descendant에서 동일 workflow 성공",
+      "proof": "https://github.com/hyungeunseanson/locally-web/actions/runs/38011999581",
+      "sha": "0106b0555eea24c31045ba2a643d1fe68d42e2e8",
+      "attempt": 1,
+      "conclusion": "failure",
+      "head": "0106b0555eea24c31045ba2a643d1fe68d42e2e8",
+      "updated": "2026-10-10T01:03:51Z",
+      "currentState": "DESCENDANT_WORKFLOW_SUCCESS"
+    },
+    {
+      "id": 38027913398,
+      "category": "INFRA_ECR_RATE_LIMIT",
+      "resolution": "후속 성공 없음",
+      "proof": "",
+      "sha": "a2af81d0132912452e38c28f0a3a857a2fe51709",
+      "attempt": 2,
+      "conclusion": "success",
+      "head": "a2af81d0132912452e38c28f0a3a857a2fe51709",
+      "updated": "2026-10-10T07:38:09Z",
+      "currentState": "SAME_RUN_RETRY_SUCCESS"
+    }
+  ],
+  "successProofs": [
+    {
+      "id": 36955154362,
+      "conclusion": "success",
+      "head": "282e3cd996fc60691eaf17e37f40ee9f01249c24",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37003407543,
+      "conclusion": "success",
+      "head": "ab81a46578bd1e09749e4fc6b8088708b35c86ff",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37003407589,
+      "conclusion": "success",
+      "head": "ab81a46578bd1e09749e4fc6b8088708b35c86ff",
+      "name": "Chat performance regressions"
+    },
+    {
+      "id": 37009619412,
+      "conclusion": "success",
+      "head": "c47e35e29514fd865cac93b3ec4eab1ef7193e72",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37084983395,
+      "conclusion": "success",
+      "head": "c1e2b354cc30929a3ef7eb0ef093752b1d430275",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37105907938,
+      "conclusion": "success",
+      "head": "da3774c745872caf69e44bbc29f7ca89e0daf313",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37126087427,
+      "conclusion": "success",
+      "head": "84d93eb93965f3016d520a94b29563760d4b6a6d",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37126087448,
+      "conclusion": "success",
+      "head": "84d93eb93965f3016d520a94b29563760d4b6a6d",
+      "name": "Chat performance regressions"
+    },
+    {
+      "id": 37173266378,
+      "conclusion": "success",
+      "head": "bb7e3d7b0d2849afd4756714761060d38b7469b1",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37190071190,
+      "conclusion": "success",
+      "head": "69d017939c933d6055ad2ca4bbd4cb190ac7b172",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37190071196,
+      "conclusion": "success",
+      "head": "69d017939c933d6055ad2ca4bbd4cb190ac7b172",
+      "name": "Chat performance regressions"
+    },
+    {
+      "id": 38001478581,
+      "conclusion": "success",
+      "head": "77d0d730fb418d68025585bcab8e08a0671ece87",
+      "name": "Authoritative Storage Byte Backup"
+    },
+    {
+      "id": 37250351392,
+      "conclusion": "success",
+      "head": "6e17ee2d160bc555e25c8a4f1f1651a51c33df9c",
+      "name": "Storage Destination Create-Only Probe"
+    },
+    {
+      "id": 37289526437,
+      "conclusion": "success",
+      "head": "a4092e408339f02d072795157a4a67bf4d56e9d7",
+      "name": "Chat performance regressions"
+    },
+    {
+      "id": 37289526480,
+      "conclusion": "success",
+      "head": "a4092e408339f02d072795157a4a67bf4d56e9d7",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37316338773,
+      "conclusion": "success",
+      "head": "479e51faf41d73e321b02c52ca3dc3ea31db5595",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37411013663,
+      "conclusion": "success",
+      "head": "080744f517126882aa58d4f7eda467611a94c984",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37465276070,
+      "conclusion": "success",
+      "head": "926961a853e56731500d3e975353c5a2a7d19e7a",
+      "name": "Cloudflare OpenNext Foundation"
+    },
+    {
+      "id": 37491456906,
+      "conclusion": "success",
+      "head": "d092ff6bb172caea3ce892e48f1ce4ca193f83ea",
+      "name": "Chat performance regressions"
+    },
+    {
+      "id": 37884009377,
+      "conclusion": "success",
+      "head": "b108c5893febd650d2737f41b1d6383a526a0228",
+      "name": "Experimental Release Browser Identity"
+    },
+    {
+      "id": 38011999581,
+      "conclusion": "success",
+      "head": "6b9892be2758836f781d94f9e054f54d7e60bb95",
+      "name": "Cloudflare OpenNext Foundation"
+    }
+  ]
+}

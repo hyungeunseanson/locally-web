@@ -484,7 +484,7 @@ jobs:
           R2_ENDPOINT: ''
         run: >-
           npx playwright test -c playwright.cloudflare-images.config.ts
-          tests/e2e/226-cloudflare-image-canary.spec.ts
+          tests/e2e/280-production-public-image-smoke.spec.ts
           tests/e2e/227-cloudflare-public-card-images.spec.ts
           tests/e2e/228-cloudflare-public-detail-images.spec.ts
           --project=chromium --workers=1

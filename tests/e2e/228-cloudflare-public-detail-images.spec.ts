@@ -78,26 +78,5 @@ test.describe('Cloudflare public experience detail image boundary', () => {
     );
   });
 
-  test('falls back to the current original when Cloudflare detail delivery fails', async ({
-    page,
-  }) => {
-    test.skip(
-      !process.env.NEXT_PUBLIC_CLOUDFLARE_IMAGE_CANARY_BASE_URL,
-      'Detail canary browser contract requires the public build-time flag.'
-    );
-
-    await page.route('https://media-canary.locally-travel.com/details/**', async (route) => {
-      await route.fulfill({ status: 503, body: 'intentional detail canary failure' });
-    });
-    await page.goto(`/experiences/${activeExperienceId}`, { waitUntil: 'domcontentloaded' });
-
-    const fallback = page.locator('[data-detail-image-delivery="supabase-fallback"]:visible').first();
-    await expect(fallback).toBeVisible({ timeout: 15_000 });
-    const fallbackSource = await fallback.getAttribute('src');
-    expect(fallbackSource).not.toBeNull();
-    expect(normalizePublicExperienceSourceUrl(fallbackSource!).sourceUrl).toBe(fallbackSource);
-    await expect(
-      page.locator('[data-detail-image-delivery="cloudflare-r2"]:visible')
-    ).toHaveCount(0);
-  });
+  // Error injection lives in the isolated Next SSR + hydration fixture (226).
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { getCloudflarePublicExperienceDetailImage } from '@/app/utils/cloudflarePublicExperienceDetailImages';
 
@@ -38,6 +38,15 @@ export default function PublicExperienceDetailImage({
     failedCloudflareTarget?.identity === targetIdentity &&
     cloudflareImage?.largeUrl === failedCloudflareTarget.url;
 
+  const cloudflareUrl = cloudflareImage?.largeUrl;
+  // SSR can finish loading a failed image before React attaches onError.
+  // Inspect the actual image on attachment so that early failures also fall back.
+  const captureImage = useCallback((image: HTMLImageElement | null) => {
+    if (image?.complete && image.naturalWidth === 0 && image.currentSrc && cloudflareUrl) {
+      setFailedCloudflareTarget({ identity: targetIdentity, url: cloudflareUrl });
+    }
+  }, [targetIdentity, cloudflareUrl]);
+
   if (cloudflareImage && !cloudflareFailed) {
     return (
       <picture>
@@ -47,6 +56,7 @@ export default function PublicExperienceDetailImage({
           type="image/webp"
         />
         <img
+          ref={captureImage}
           src={cloudflareImage.mediumUrl}
           alt={alt}
           loading={eager ? 'eager' : 'lazy'}
