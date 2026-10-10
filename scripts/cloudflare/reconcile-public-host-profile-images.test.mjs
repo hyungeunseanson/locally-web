@@ -176,3 +176,44 @@ test('post-write source verification shares the byte budget and detects same-URL
     globalThis.fetch = originalFetch;
   }
 });
+
+test('managed originals require canonical owner-bound keys and never enter the legacy writer', async () => {
+  const { HOST_PROFILE_BASE_URL, hostProfileKey } = await import('../../app/utils/hostProfileMediaContract.mjs');
+  const { AVATAR_BASE_URL, avatarKey } = await import('../../app/utils/avatarMediaContract.mjs');
+  const url = `${HOST_PROFILE_BASE_URL}/${hostProfileKey(hostA, hostB)}`;
+  const avatar = `${AVATAR_BASE_URL}/${avatarKey(hostA, hostB, 'image/webp')}`;
+  assert.equal(normalizePublicHostProfileSourceUrl(url, ['application-profile'], hostA)?.sourceKind, 'managed-host-original');
+  assert.equal(normalizePublicHostProfileSourceUrl(avatar, ['public-profile-avatar'], hostA)?.sourceKind, 'managed-avatar-original');
+  for (const unsafe of [url+'?signature=x',url+'#fragment',url.replace('/profile','/avatar-w128.webp'),url.replace('https://','http://'),url.replace('host-profile-media.', 'evil.'),url.replace('/v1/','/v2/'),url.replace('/profile','/%70rofile'),url+'/',url.replace('https://','https://user@')]) {
+    assert.equal(normalizePublicHostProfileSourceUrl(unsafe, ['application-profile'], hostA), null);
+  }
+  assert.equal(normalizePublicHostProfileSourceUrl(url, ['application-profile'], hostB), null);
+  assert.equal(normalizePublicHostProfileSourceUrl(url), null, 'owner is mandatory for R2');
+  assert.equal(normalizePublicHostProfileSourceUrl(avatar, ['public-profile-avatar'], hostB), null);
+  const state = normalizeInventory([{id:1,user_id:hostA,status:'approved',profile_photo:url}]);
+  assert.equal(state.summary.managedOriginalCount,1);
+  assert.equal(state.summary.unexpectedPhotoCount,0);
+  const legacy = buildExpectedManifest([{hostId:hostA,originUrl:profileUrl(hostA)}]);
+  assert.deepEqual(buildExpectedManifest(state.inventory,legacy),legacy);
+  assert.throws(()=>buildSpecifications({[hostA]:{...legacy[hostA],originUrl:url}}),/Refusing/);
+});
+
+test('scheduled host reconciliation is audit-only after source authority cutover', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const source = await readFile('.github/workflows/public-host-profile-image-reconciliation.yml','utf8');
+  const condition = source.split('  reconcile:')[1].split('runs-on:')[0];
+  assert.match(condition,/github.event_name == 'workflow_dispatch' && inputs.action != 'audit'/);
+  assert.doesNotMatch(condition,/schedule/);
+});
+
+test('managed availability audit is HEAD-only, bounded, and refuses redirects or missing originals', async () => {
+  const {verifyManagedOriginals} = await import('./reconcile-public-host-profile-images.mjs');
+  const {HOST_PROFILE_BASE_URL,hostProfileKey} = await import('../../app/utils/hostProfileMediaContract.mjs');
+  const inventory=[{hostId:hostA,originUrl:`${HOST_PROFILE_BASE_URL}/${hostProfileKey(hostA,hostB)}`,sourceKind:'managed-host-original'}];
+  const result=await verifyManagedOriginals(inventory,async(url,options)=>{
+    assert.equal(options.method,'HEAD');assert.equal(options.redirect,'manual');
+    return new Response(null,{status:200,headers:{'content-length':'10','content-type':'image/jpeg'}});
+  });
+  assert.equal(result.managedOriginalHeadVerifiedCount,1);
+  for(const status of [301,404,503]) await assert.rejects(verifyManagedOriginals(inventory,async()=>new Response(null,{status})),/availability/);
+});

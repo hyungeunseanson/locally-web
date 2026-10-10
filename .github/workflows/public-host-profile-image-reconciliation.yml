@@ -112,8 +112,7 @@ jobs:
   reconcile:
     needs: audit
     if: >-
-      (github.event_name == 'schedule' && needs.audit.outputs.drift == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.action != 'audit')
+      github.event_name == 'workflow_dispatch' && inputs.action != 'audit'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: production-profile-media-sync
@@ -307,7 +306,7 @@ jobs:
           R2_ENDPOINT: ''
         run: >-
           npx playwright test -c playwright.cloudflare-images.config.ts
-          tests/e2e/226-cloudflare-image-canary.spec.ts
+          tests/e2e/280-production-public-image-smoke.spec.ts
           tests/e2e/227-cloudflare-public-card-images.spec.ts
           tests/e2e/228-cloudflare-public-detail-images.spec.ts
           tests/e2e/233-cloudflare-public-host-profile-images.spec.ts

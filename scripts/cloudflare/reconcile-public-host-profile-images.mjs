@@ -5,6 +5,9 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { createSupabaseApiKeyHeaders } from '../../app/utils/supabase/apiKeys.mjs';
 
+import { HOST_PROFILE_BASE_URL, hostProfileKey } from '../../app/utils/hostProfileMediaContract.mjs';
+import { AVATAR_BASE_URL, avatarKey } from '../../app/utils/avatarMediaContract.mjs';
+
 const MANIFEST_PATH = path.resolve('app/data/publicHostProfileImages.generated.json');
 const EXCLUSIONS_PATH = path.resolve('config/public-host-profile-r2-exclusions.json');
 const PUBLIC_STORAGE_ORIGIN = 'https://uhinvcydgzqlpnvieyal.supabase.co';
@@ -112,8 +115,26 @@ export function normalizePublicHostProfileSourceUrl(
   if (typeof value !== 'string' || value !== value.trim()) return null;
   try {
     const parsed = new URL(value);
-    if (parsed.origin !== PUBLIC_STORAGE_ORIGIN || parsed.search || parsed.hash || parsed.username || parsed.password) return null;
+    if (parsed.search || parsed.hash || parsed.username || parsed.password) return null;
     if (parsed.href !== value) return null;
+    // Managed originals have their own authority; never treat a derivative as a source.
+    if (expectedHostId && parsed.origin === HOST_PROFILE_BASE_URL && allowedKinds.includes('application-profile')) {
+      const asset = parsed.pathname.split('/')[4];
+      if (value === `${HOST_PROFILE_BASE_URL}/${hostProfileKey(expectedHostId, asset)}`) {
+        return { originUrl: value, sourceKind: 'managed-host-original' };
+      }
+      return null;
+    }
+    if (expectedHostId && parsed.origin === AVATAR_BASE_URL && allowedKinds.includes('public-profile-avatar')) {
+      const asset = parsed.pathname.split('/')[4];
+      for (const mime of ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']) {
+        if (value === `${AVATAR_BASE_URL}/${avatarKey(expectedHostId, asset, mime)}`) {
+          return { originUrl: value, sourceKind: 'managed-avatar-original' };
+        }
+      }
+      return null;
+    }
+    if (parsed.origin !== PUBLIC_STORAGE_ORIGIN) return null;
     if (
       allowedKinds.includes('application-profile')
       && PROFILE_PATH_PATTERN.test(parsed.pathname)
@@ -153,9 +174,10 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
   let externalAvatarExcludedCount = 0;
   let applicationProfileCount = 0;
   let publicProfileAvatarCount = 0;
+  let managedOriginalCount = 0;
 
   for (const row of visibleRows) {
-    const photo = typeof row.profile_photo === 'string' ? row.profile_photo.trim() : '';
+    const photo = typeof row.profile_photo === 'string' ? row.profile_photo : '';
     const applicationSource = photo
       ? normalizePublicHostProfileSourceUrl(photo, ['application-profile'], row.user_id)
       : null;
@@ -164,7 +186,7 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
       continue;
     }
     const publicAvatar = typeof profilesById.get(row.user_id)?.avatar_url === 'string'
-      ? profilesById.get(row.user_id).avatar_url.trim()
+      ? profilesById.get(row.user_id).avatar_url
       : '';
     const avatarSource = !photo && publicAvatar
       ? normalizePublicHostProfileSourceUrl(
@@ -186,7 +208,8 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
       excludedHostCount += 1;
       continue;
     }
-    if (source.sourceKind === 'application-profile') applicationProfileCount += 1;
+    if (source.sourceKind.startsWith('managed-')) managedOriginalCount += 1;
+    else if (source.sourceKind === 'application-profile') applicationProfileCount += 1;
     else publicProfileAvatarCount += 1;
     inventory.push({ hostId: row.user_id, ...source });
   }
@@ -209,6 +232,7 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
       externalAvatarExcludedCount,
       applicationProfileCount,
       publicProfileAvatarCount,
+      managedOriginalCount,
       snapshotHash: snapshotHash({
         applications: latestRows.map((row) => ({
           id: row.id,
@@ -226,7 +250,27 @@ export function normalizeInventory(rows, exclusions = [], profiles = []) {
   };
 }
 
-export function buildExpectedManifest(inventory) {
+export async function verifyManagedOriginals(inventory, fetchImplementation = fetch) {
+  const managed = inventory.filter(item => item.sourceKind.startsWith('managed-'));
+  if (managed.length > 256) throw new Error('Managed source audit exceeds bounded inventory.');
+  for (let index = 0; index < managed.length; index += 4) {
+    await Promise.all(managed.slice(index, index + 4).map(async item => {
+      const source = normalizePublicHostProfileSourceUrl(item.originUrl, ['application-profile', 'public-profile-avatar'], item.hostId);
+      if (!source || source.sourceKind !== item.sourceKind) throw new Error('Managed source identity mismatch.');
+      const response = await fetchImplementation(item.originUrl, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(15000) });
+      const length = Number(response.headers.get('content-length'));
+      if (response.status !== 200 || !response.headers.get('content-type')?.startsWith('image/') || !Number.isSafeInteger(length) || length <= 0 || length > 10 * 1024 * 1024) {
+        throw new Error('Managed original availability or bounded image metadata check failed.');
+      }
+    }));
+  }
+  return { managedOriginalHeadVerifiedCount: managed.length, sourceBodiesDownloaded: 0 };
+}
+
+export function buildExpectedManifest(inventory, currentManifest = {}) {
+  // Freeze the legacy manifest during authority transition. Its fallback entries
+  // cannot be retired or regenerated by a managed-original inventory audit.
+  if (inventory.some(item => item.sourceKind?.startsWith('managed-'))) return structuredClone(currentManifest);
   return Object.fromEntries(inventory.map(({ hostId, originUrl }) => {
     const hash = urlHash(originUrl);
     const prefix = `hosts/${hostId}/${hash}`;
@@ -247,7 +291,7 @@ export function buildSpecifications(manifest) {
       ['application-profile', 'public-profile-avatar'],
       hostId,
     );
-    if (!source) throw new Error(`Refusing unexpected profile origin for host ${hostId}.`);
+    if (!source || source.sourceKind.startsWith('managed-')) throw new Error(`Refusing unexpected profile origin for host ${hostId}.`);
     specifications.push(
       { hostId, originUrl: entry.originUrl, sourceKind: source.sourceKind, key: entry.smallKey, width: 128, quality: 80 },
       { hostId, originUrl: entry.originUrl, sourceKind: source.sourceKind, key: entry.largeKey, width: 256, quality: 80 },
@@ -321,7 +365,7 @@ async function loadState() {
   const profiles = await fetchPublicProfiles(latestRows.map((row) => row.user_id));
   const normalized = normalizeInventory(rows, exclusions, profiles);
   const currentManifest = JSON.parse(manifestSource);
-  const expectedManifest = buildExpectedManifest(normalized.inventory);
+  const expectedManifest = buildExpectedManifest(normalized.inventory, currentManifest);
   const drift = stableJson(currentManifest) !== stableJson(expectedManifest);
   return {
     ...normalized,
@@ -333,6 +377,7 @@ async function loadState() {
       currentManifestHostCount: Object.keys(currentManifest).length,
       expectedManifestHostCount: Object.keys(expectedManifest).length,
       drift,
+      manifestPolicy: normalized.summary.managedOriginalCount > 0 ? 'legacy-retained-managed-authority' : 'legacy-derived',
     },
   };
 }
@@ -486,6 +531,8 @@ export async function verifySourceBytes(specificationsPath, objectsPath, priorSo
 }
 
 async function writePlan(state, outputDirectory) {
+  if (state.summary.managedOriginalCount > 0) throw new Error('Managed originals require an authority-specific plan; legacy mutation is prohibited.');
+  if (state.summary.unexpectedPhotoCount > 0 || state.inventory.length === 0) throw new Error('Refusing unsafe or empty profile manifest.');
   const specifications = buildSpecifications(state.expectedManifest);
   await Promise.all([
     writeFile(path.join(outputDirectory, 'publicHostProfileImages.generated.json'), stableJson(state.expectedManifest)),
@@ -514,6 +561,7 @@ async function publishSummaryOutputs(summary) {
     external_avatar_excluded_count: summary.externalAvatarExcludedCount,
     application_profile_count: summary.applicationProfileCount,
     public_profile_avatar_count: summary.publicProfileAvatarCount,
+    managed_original_count: summary.managedOriginalCount,
   })) await appendGithubOutput(name, value);
 }
 
@@ -550,7 +598,7 @@ async function main() {
   if (args.command === 'purge-check') {
     const hostId = validateHostId(args.hostId);
     const state = await loadState();
-    const liveEntry = buildExpectedManifest(normalizeInventory(state.latestRows, []).inventory)[hostId] || null;
+    const liveEntry = state.inventory.find(item => item.hostId === hostId) || null;
     const excluded = state.exclusions.includes(hostId);
     if (liveEntry && !excluded) throw new Error('Refusing to purge the current Production profile image for an eligible public host.');
     const result = { hostId, snapshotHash: state.summary.snapshotHash, excluded, currentlyEligible: Boolean(liveEntry), purgeAllowed: true };
@@ -561,6 +609,7 @@ async function main() {
   }
 
   const state = await loadState();
+  if (args.command === 'audit') Object.assign(state.summary, await verifyManagedOriginals(state.inventory));
   await mkdir(args.output, { recursive: true });
   await writeFile(path.join(args.output, 'audit.json'), stableJson(state.summary));
   await publishSummaryOutputs(state.summary);

@@ -62,7 +62,7 @@ const controlledRepairWorkflow = readFileSync(
 );
 
 const experienceSpecs = [
-  'tests/e2e/226-cloudflare-image-canary.spec.ts',
+  'tests/e2e/280-production-public-image-smoke.spec.ts',
   'tests/e2e/227-cloudflare-public-card-images.spec.ts',
   'tests/e2e/228-cloudflare-public-detail-images.spec.ts',
 ];
@@ -149,7 +149,7 @@ test.describe('Production reconciliation image checks stay read-only', () => {
   test('runs manifest-independent completeness without coupling manual audit to legacy writes', () => {
     expect(experienceWorkflow).toContain('Run manifest-independent metadata completeness audit');
     expect(experienceWorkflow).toContain('audit-public-experience-media.mjs metadata');
-    expect(experienceWorkflow).toContain("options: [audit, plan, apply, legacy-reconcile]");
+    expect(experienceWorkflow).toContain("options: [audit, plan, apply, source-copy-plan, source-copy-apply, legacy-reconcile]");
     expect(experienceWorkflow).toContain("github.event_name == 'schedule' || inputs.action == 'legacy-reconcile'");
     expect(experienceWorkflow).toContain('group: public-experience-image-reconciliation');
     expect(experienceWorkflow).toContain('needs: audit');
