@@ -1,7 +1,10 @@
 import './helpers/serverOnlyTestShim';
 import { expect, test } from '@playwright/test';
 import { classifyExperienceText, inspectExperienceLocale } from '@/app/utils/experienceTranslation/integrity';
-import { FIXED_EXPERIENCE_POLICY_ID, getLocalizedExperienceList, getLocalizedExperienceRules, getLocalizedExperienceItinerary, getLocalizedRefundPolicyLabel } from '@/app/utils/experienceTranslation';
+import { FIXED_EXPERIENCE_POLICY_ID, buildManualContentFromExperience, getLocalizedExperienceList, getLocalizedExperienceRules, getLocalizedExperienceItinerary, getLocalizedRefundPolicyLabel } from '@/app/utils/experienceTranslation';
+import { FIXED_REFUND_POLICY } from '@/app/host/create/config';
+import { buildExperienceWritePayload, type ExperienceFormState } from '@/app/host/create/experienceFormState';
+import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import { getContent } from '@/app/utils/contentHelper';
 import { createExperienceFromBody, updateExperienceFromBody, toApiErrorResponse, type ExperienceWriteDependencies } from '@/app/api/host/experiences/shared';
 
@@ -192,6 +195,54 @@ test('pending admin Korean title edit preserves incomplete English and Japanese 
   expect(h.filters).toContainEqual(['media_revision', 3]);
   expect(h.filters).toContainEqual(['status', 'pending']);
   expect(h.filters).toContainEqual(['translation_version', 1]);
+  expect(h.queues).toBe(1);
+});
+
+test('anonymized 4839-shaped edit form PATCH reaches the title-only write path', async () => {
+  const { existing } = await pendingManualBodyFixture();
+  const base = existing as Record<string, unknown>;
+  const levels = [
+    { language: '한국어', level: 4 }, { language: '영어', level: 1 }, { language: '일본어', level: 5 },
+  ];
+  const itinerary = [
+    { title: '만남 장소', description: '호스트와 만납니다.', type: 'meet', image_url: 'https://example.test/stop.jpg' },
+    { title: '첫 장소', description: '동네를 둘러봅니다.', type: 'spot', image_url: '' },
+    { title: '둘째 장소', description: '함께 산책합니다.', type: 'spot', image_url: '' },
+  ];
+  const stored = {
+    ...existing,
+    country: 'Japan', city: '오사카', category: '맛집 탐방',
+    language_levels: levels, languages: getLanguageNames(normalizeLanguageLevels(levels, [], 3)),
+    photos: ['https://example.test/one.jpg', 'https://example.test/two.jpg', 'https://example.test/three.jpg'],
+    itinerary, itinerary_i18n: { ko: itinerary, zh: itinerary },
+    meeting_point_i18n: { ko: base.meeting_point, zh: base.meeting_point },
+    rules_i18n: { ko: base.rules, zh: base.rules },
+    duration: 3, max_guests: 10, price: '50000', private_price: '120000',
+    solo_guarantee_price: 30000, is_private_enabled: true, media_revision: 3,
+  };
+  const manualContent = buildManualContentFromExperience(stored, ['ko', 'en', 'ja'], 'ko');
+  const form = {
+    ...stored,
+    subCity: '',
+    manual_content: { ...manualContent, ko: { ...manualContent.ko, title: '수정한 오사카 골목 산책 체험' } },
+    rules: { ...(base.rules as Record<string, unknown>), refund_policy: FIXED_REFUND_POLICY },
+    language_levels: normalizeLanguageLevels(stored.language_levels, stored.languages, 3),
+    itinerary: stored.itinerary.map(item => ({ ...item, image_url: item.image_url || '' })),
+  } as unknown as ExperienceFormState;
+  const patch = buildExperienceWritePayload({
+    ...form,
+    inclusions: form.inclusions.map(item => item.trim()).filter(Boolean),
+    exclusions: form.exclusions.map(item => item.trim()).filter(Boolean),
+    duration: Number(form.duration),
+    maxGuests: Number(stored.max_guests),
+    meeting_point: form.meeting_point || form.itinerary[0].title,
+  });
+  const h = harness(stored);
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: patch }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual(['en', 'ja']);
+  expect(h.writes).toHaveLength(1);
+  expect(Object.keys(h.writes[0]).sort()).toEqual(['title', 'title_ko', 'translation_meta', 'translation_version']);
+  expect(h.writes[0].translation_version).toBe(2);
   expect(h.queues).toBe(1);
 });
 

@@ -357,7 +357,7 @@ test.describe('default-OFF public experience media Queue producer', () => {
     expect(updateRoute).toContain('return handleHostExperienceUpdate(request, context)');
     expect(photoRouteEntry).toContain('return handleAdminExperiencePhotoReorder(request, context)');
     expect(adminExperience).toContain(".select('id, status, is_active, photos, itinerary, image_url')");
-    const activationGuard = adminExperience.indexOf("if (!updatedExperience) throw new Error('Experience not found')");
+    const activationGuard = adminExperience.search(/if \(!updatedExperience\) throw new Error\(/);
     const activationHook = adminExperience.indexOf("writeKind: 'activation'");
     const reorderGuard = photoRoute.indexOf('if (!updatedExperience)');
     const reorderHook = photoRoute.indexOf("writeKind: 'reorder'");

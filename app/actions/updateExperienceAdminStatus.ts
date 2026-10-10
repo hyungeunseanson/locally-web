@@ -66,6 +66,7 @@ export async function executeUpdateExperienceAdminStatus(
   let mediaBefore: PublicExperienceMediaRow | null = null;
   let checkedTranslationVersion: number | null = null;
   let checkedStatus: string | null = null;
+  let checkedTranslationMeta: unknown = null;
   try {
     const { data } = await supabaseAdmin
       .from('experiences')
@@ -111,10 +112,11 @@ export async function executeUpdateExperienceAdminStatus(
       const missing = findMissingExperienceBodyFields(sourceBody, targetBody);
       if (!String(row[`title_${locale}`] ?? '').trim()) missing.push('title');
       if (!String(row[`description_${locale}`] ?? '').trim()) missing.push('description');
-      const meta = (row.translation_meta as Record<string, { status?: string }> | null)?.[locale];
-      if (missing.length || meta?.status === 'failed') {
+      const meta = (row.translation_meta as Record<string, { mode?: string; status?: string; version?: number }> | null)?.[locale];
+      if (missing.length || meta?.mode !== 'manual' || meta.status !== 'ready' || meta.version !== checkedTranslationVersion) {
         throw new Error(`선택한 언어(${locale})의 번역을 보완한 뒤 승인해주세요.`);
       }
+      checkedTranslationMeta = row.translation_meta;
     }
   }
 
@@ -129,6 +131,9 @@ export async function executeUpdateExperienceAdminStatus(
     .eq('id', id);
   if (checkedTranslationVersion !== null) {
     updateQuery = updateQuery.eq('translation_version', checkedTranslationVersion).eq('status', checkedStatus);
+    if (checkedTranslationMeta !== null) {
+      updateQuery = updateQuery.eq('translation_meta', JSON.stringify(checkedTranslationMeta));
+    }
   }
   const { data: updatedExperience, error } = await updateQuery
     .select('id, status, is_active, photos, itinerary, image_url')

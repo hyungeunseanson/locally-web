@@ -746,6 +746,67 @@ test.describe('public experience media producer application integration', () => 
     database.assertExhausted();
   });
 
+  test('admin approval requires complete manual body at ready status and current version', async () => {
+    const completeManual = mediaRow({
+      status: 'pending', manual_locales: ['ko', 'en'],
+      title_en: 'Seoul neighborhood walk',
+      description_en: 'Walk through Seoul neighborhoods with a local host and learn about daily life.',
+      meeting_point_i18n: { en: 'Seoul Station exit one' },
+      supplies_i18n: { en: 'Comfortable shoes' },
+      inclusions_i18n: { en: ['Local guide'] },
+      exclusions_i18n: { en: ['Transport fare'] },
+      itinerary_i18n: { en: [{ title: 'Meeting place', description: 'Meet the local host.', type: 'meet', image_url: ITINERARY_PHOTO }] },
+      rules_i18n: { en: { age_limit: 'Ages twelve and older', activity_level: 'Moderate', refund_policy: 'standard', host_notice: '' } },
+    });
+    for (const [translationStatus, version] of [
+      ['failed', 1], ['queued', 1], ['processing', 1], ['ready', 0],
+    ] as const) {
+      const producer = producerHarness();
+      const database = new FakeDatabase([
+        { table: 'experiences', operation: 'select', result: success(completeManual) },
+        { table: 'experiences', operation: 'select', result: success({
+          ...completeManual,
+          translation_meta: { en: { mode: 'manual', status: translationStatus, version } },
+        }) },
+      ]);
+      await expect(executeUpdateExperienceAdminStatus(42, 'active', undefined, {
+        getAdminClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'admin-1' } } }) } }),
+        createAdminClient: () => asAdminClient(database),
+        scheduleMediaProducer: producer.schedule,
+        buildLocalizedNotificationInsert: async () => ({} as never),
+        sendImmediateGenericEmail: async () => emailResult(),
+        recordAuditLog: async () => undefined,
+      })).rejects.toThrow('선택한 언어(en)의 번역을 보완');
+      expect(database.calls.some((call) => call.operation === 'update')).toBe(false);
+      expect(producer.sendAttempts).toBe(0);
+      database.assertExhausted();
+    }
+
+    const readyMeta = { en: { mode: 'manual', status: 'ready', version: 1 } };
+    for (const updateResult of [success(null), success(mediaRow({ status: 'active' }))]) {
+      const producer = producerHarness();
+      const database = new FakeDatabase([
+        { table: 'experiences', operation: 'select', result: success(completeManual) },
+        { table: 'experiences', operation: 'select', result: success({ ...completeManual, translation_meta: readyMeta }) },
+        { table: 'experiences', operation: 'update', result: updateResult },
+        ...(!updateResult.data ? [] : [{ table: 'experiences', operation: 'select' as const, result: success(null) }]),
+      ]);
+      const action = executeUpdateExperienceAdminStatus(42, 'active', undefined, {
+        getAdminClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'admin-1' } } }) } }),
+        createAdminClient: () => asAdminClient(database),
+        scheduleMediaProducer: producer.schedule,
+        buildLocalizedNotificationInsert: async () => ({} as never),
+        sendImmediateGenericEmail: async () => emailResult(),
+        recordAuditLog: async () => undefined,
+      });
+      if (updateResult.data) await expect(action).resolves.toEqual({ success: true });
+      else await expect(action).rejects.toThrow('체험이 변경되었습니다');
+      expect(database.filters).toContainEqual({ table: 'experiences', operation: 'update', column: 'translation_meta', value: JSON.stringify(readyMeta) });
+      expect(producer.sendAttempts).toBe(updateResult.data ? 1 : 0);
+      database.assertExhausted();
+    }
+  });
+
   test('admin status action sends only for an actually public-active returned row', async () => {
     for (const scenario of [
       { status: 'active', isActive: true, expectedSends: 1 },

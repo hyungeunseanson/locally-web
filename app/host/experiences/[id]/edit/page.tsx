@@ -98,6 +98,7 @@ export default function EditExperiencePage() {
   const [formData, setFormData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingItineraryIndex, setUploadingItineraryIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'course'>('basic');
@@ -111,7 +112,9 @@ export default function EditExperiencePage() {
   const initializedExperienceIdRef = useRef<string | null>(null);
   const loadGenerationRef = useRef(0);
   const loadUiRef = useRef({ t, adminReturnPath });
-  loadUiRef.current = { t, adminReturnPath };
+  useEffect(() => {
+    loadUiRef.current = { t, adminReturnPath };
+  }, [t, adminReturnPath]);
 
   // 데이터 불러오기
   useEffect(() => {
@@ -274,7 +277,25 @@ export default function EditExperiencePage() {
         throw new Error(result?.error || t('msg_edit_permission_fail'));
       }
 
-      showToast(t('msg_save_success'), 'success'); // 🟢 번역
+      const incompleteManualLocales = Array.isArray(result.incompleteManualLocales)
+        ? result.incompleteManualLocales.filter(isExperienceLocale)
+        : [];
+      if (incompleteManualLocales.length > 0) {
+        const names = incompleteManualLocales.map((locale: string) => {
+          const option = EXPERIENCE_LANGUAGE_OPTIONS.find((item) => item.code === locale);
+          return option ? getLocalizedText(option.labels, lang) : locale;
+        }).join(', ');
+        const notice = {
+          ko: `${names} 번역 본문이 누락되어 승인 전에 보완이 필요합니다.`,
+          en: `${names} translation content is missing and must be completed before approval.`,
+          ja: `${names}の翻訳本文が不足しています。承認前に補完してください。`,
+          zh: `${names}的翻译正文缺失，请在批准前补全。`,
+        };
+        setSaveNotice(`${t('msg_save_success')} ${notice[lang]}`);
+      } else {
+        setSaveNotice(null);
+      }
+      showToast(t('msg_save_success'), 'success');
       router.refresh();
     } catch (e: any) {
       showToast(t('msg_save_fail') + e.message, 'error'); // 🟢 번역
@@ -503,6 +524,12 @@ export default function EditExperiencePage() {
             {saving ? <><Loader2 className="animate-spin" size={16} /> {t('btn_save_loading')}</> : <><Save size={16} /> {t('btn_save')}</>} {/* 🟢 번역 */}
           </button>
         </div>
+
+        {saveNotice && (
+          <p role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            {saveNotice}
+          </p>
+        )}
 
         <h1 className="text-lg md:text-2xl font-black text-slate-900 leading-tight mb-4 md:mb-6 line-clamp-2">{sourceTitle}</h1>
 
