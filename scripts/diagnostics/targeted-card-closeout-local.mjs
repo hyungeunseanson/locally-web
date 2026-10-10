@@ -94,7 +94,7 @@ try{
   '@/app/utils/supabase/admin':`export const createAdminClient=()=>globalThis.__targetedAdmin;`,
   '@/app/utils/supabase/server':`export const createClient=async()=>({auth:{getUser:async()=>({data:{user:globalThis.__targetedAuth===undefined?{id:'${user}'}:globalThis.__targetedAuth},error:null})}});`,
   '@/app/utils/monitoring/sentry':`export function captureServerException(){}`,
-  '@/app/utils/adminAlertCenter':`export async function insertAdminAlerts(){} export async function sendAdminPaymentConfirmedEmail(){globalThis.__adminEmail();}`,
+  '@/app/utils/adminAlertCenter':`export async function insertAdminAlerts(){} export async function sendAdminAlertEmails(){} export async function sendAdminPaymentConfirmedEmail(){globalThis.__adminEmail();}`,
   'next/cache':`export function revalidatePath(){}`,
   '@/app/utils/experienceNotificationFlows':`export async function notifyExperiencePaymentConfirmed(){globalThis.__notification();}`,
   '@/app/api/proxy-bookings/payment/proxyCardConfirmation':`export async function finalizeProxyCardPayment(){throw new Error('FORBIDDEN_PROXY');}`,
