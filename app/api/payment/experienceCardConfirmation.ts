@@ -12,6 +12,8 @@ import {
 import { cancelCardPayment } from '@/app/utils/payments/card/server';
 import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { isTargetedNicePayCloseout } from '@/app/utils/payments/card/targetedCloseoutTargets';
+import { recordTargetedNicePayApproval } from '@/app/utils/payments/card/targetedNicePayCloseout';
 
 type ExperienceMeta = {
   price?: number | null;
@@ -175,6 +177,16 @@ export async function finalizeExperienceCardPayment(params: {
   originalBooking: ExperienceCardBookingRow;
   verificationResult: VerifiedCardPayment;
 }): Promise<ExperienceCardConfirmationResult> {
+  if (isTargetedNicePayCloseout(params.originalBooking.order_id || params.originalBooking.id)) {
+    // Persist an approval candidate before rejecting normal confirmation.
+    // Actual refunds require the explicitly invoked signed-proof recovery.
+    await recordTargetedNicePayApproval({
+      supabaseAdmin: params.supabaseAdmin,
+      orderId: params.originalBooking.id,
+      payment: params.verificationResult,
+    });
+    return { success: false, status: 409, error: '종료 대상 결제 시도의 승인 증거가 보존되었습니다. 관리자 대조가 필요합니다.' };
+  }
   const releasedApprovalResolution = await reconcileExplicitReleasedNicePayApproval(params);
   if (releasedApprovalResolution) return releasedApprovalResolution;
 
