@@ -179,6 +179,7 @@ test('pending admin Korean title edit preserves incomplete English and Japanese 
   const h = harness(existing);
   const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
   expect(result.incompleteManualLocales).toEqual(['en', 'ja']);
+  expect(result.manualLocalesNeedingReview).toEqual([]);
   expect(result.queuedLocales).toEqual(['zh']);
   expect(h.writes).toHaveLength(1);
   expect(h.writes[0]).toEqual({
@@ -240,6 +241,7 @@ test('anonymized 4839-shaped edit form PATCH reaches the title-only write path',
   const h = harness(stored);
   const result = await updateExperienceFromBody({ experienceId: 1, actor, body: patch }, h.dependencies);
   expect(result.incompleteManualLocales).toEqual(['en', 'ja']);
+  expect(result.manualLocalesNeedingReview).toEqual([]);
   expect(h.writes).toHaveLength(1);
   expect(Object.keys(h.writes[0]).sort()).toEqual(['title', 'title_ko', 'translation_meta', 'translation_version']);
   expect(h.writes[0].translation_version).toBe(2);
@@ -264,8 +266,25 @@ test('a complete retained manual translation is not certified against the new Ko
   const h = harness(complete);
   const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
   expect(result.incompleteManualLocales).toEqual([]);
+  expect(result.manualLocalesNeedingReview).toEqual(['en', 'ja']);
   expect(h.writes[0]).not.toHaveProperty('meeting_point_i18n');
   expect(h.writes[0]).not.toHaveProperty('title_en');
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).en.status).toBe('failed');
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).ja.status).toBe('failed');
+});
+
+test('title-only save separates complete translations needing review from missing bodies', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const h = harness({
+    ...existing,
+    meeting_point_i18n: { en: 'Koenji Station' },
+    inclusions_i18n: { en: ['Local guide'] },
+    itinerary_i18n: { en: [{ title: 'Meet', description: 'Meet at the station.', type: 'meet', image_url: '' }] },
+    rules_i18n: { en: { age_limit: 'Ages 20 and over', activity_level: 'Moderate', refund_policy: '', refund_policy_id: FIXED_EXPERIENCE_POLICY_ID, host_notice: '' } },
+  });
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual(['ja']);
+  expect(result.manualLocalesNeedingReview).toEqual(['en']);
   expect((h.writes[0].translation_meta as Record<string, { status: string }>).en.status).toBe('failed');
   expect((h.writes[0].translation_meta as Record<string, { status: string }>).ja.status).toBe('failed');
 });

@@ -849,6 +849,9 @@ export async function updateExperienceFromBody(params: {
       localeIntegrityWarnings.push(...integrity.issues);
     }
   }
+  const manualLocalesNeedingReview = pendingAdminKoreanTitleOnly
+    ? mergedManualLocales.filter((locale) => locale !== input.sourceLocale && !incompleteManualLocales.includes(locale))
+    : [];
   const translationState = buildExperienceTranslationState({
     sourceLocale: input.sourceLocale,
     manualContent: nextManualContent,
@@ -999,6 +1002,7 @@ export async function updateExperienceFromBody(params: {
     id: data.id,
     localeIntegrityWarnings,
     incompleteManualLocales,
+    manualLocalesNeedingReview,
     queuedLocales: translationDirty ? translationState.queuedLocales : [],
   };
 }

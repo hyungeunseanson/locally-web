@@ -280,21 +280,33 @@ export default function EditExperiencePage() {
       const incompleteManualLocales = Array.isArray(result.incompleteManualLocales)
         ? result.incompleteManualLocales.filter(isExperienceLocale)
         : [];
+      const manualLocalesNeedingReview = Array.isArray(result.manualLocalesNeedingReview)
+        ? result.manualLocalesNeedingReview.filter(isExperienceLocale)
+        : [];
+      const localeNames = (locales: string[]) => locales.map((locale) => {
+        const option = EXPERIENCE_LANGUAGE_OPTIONS.find((item) => item.code === locale);
+        return option ? getLocalizedText(option.labels, lang) : locale;
+      }).join(', ');
+      const notices: string[] = [];
       if (incompleteManualLocales.length > 0) {
-        const names = incompleteManualLocales.map((locale: string) => {
-          const option = EXPERIENCE_LANGUAGE_OPTIONS.find((item) => item.code === locale);
-          return option ? getLocalizedText(option.labels, lang) : locale;
-        }).join(', ');
-        const notice = {
+        const names = localeNames(incompleteManualLocales);
+        notices.push({
           ko: `${names} 번역 본문이 누락되어 승인 전에 보완이 필요합니다.`,
           en: `${names} translation content is missing and must be completed before approval.`,
           ja: `${names}の翻訳本文が不足しています。承認前に補完してください。`,
           zh: `${names}的翻译正文缺失，请在批准前补全。`,
-        };
-        setSaveNotice(`${t('msg_save_success')} ${notice[lang]}`);
-      } else {
-        setSaveNotice(null);
+        }[lang]);
       }
+      if (manualLocalesNeedingReview.length > 0) {
+        const names = localeNames(manualLocalesNeedingReview);
+        notices.push({
+          ko: `${names} 수동 번역은 새 한국어 제목과 대조해 승인 전에 관리자 재검토가 필요합니다.`,
+          en: `${names} manual translations need admin review against the new Korean title before approval.`,
+          ja: `${names}の手動翻訳は、新しい韓国語のタイトルと照合して承認前に管理者が再確認する必要があります。`,
+          zh: `${names}的人工翻译需对照新的韩语标题，由管理员在批准前复核。`,
+        }[lang]);
+      }
+      setSaveNotice(notices.length > 0 ? `${t('msg_save_success')} ${notices.join(' ')}` : null);
       showToast(t('msg_save_success'), 'success');
       router.refresh();
     } catch (e: any) {
