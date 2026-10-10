@@ -21,7 +21,6 @@ const NICEPAY_APPROVAL_SUCCESS_CODES = new Set(['3001']);
 const NICEPAY_NOTIFICATION_SUCCESS_CODES = new Set(['3001', '0000']);
 const NICEPAY_NOTIFICATION_SUCCESS_STATE_CODES = new Set(['0']);
 const NICEPAY_STATUS_QUERY_SUCCESS_CODES = new Set(['0000']);
-const NICEPAY_STATUS_QUERY_SUCCESS_STATUS = new Set(['0']);
 const NICEPAY_STATUS_QUERY_URL = 'https://webapi.nicepay.co.kr/webapi/inquery/trans_status.jsp';
 const NICEPAY_CANCEL_URL = 'https://pg-api.nicepay.co.kr/webapi/cancel_process.jsp';
 const NICEPAY_ALLOWED_APPROVAL_HOSTS = new Set([
@@ -38,6 +37,8 @@ type NicePayRuntimeConfig = {
 };
 
 type NicePayStatusResponse = Record<string, string>;
+
+export type NicePayPaymentState = 'approved' | 'cancelled' | 'missing';
 
 function parseNumber(value: number | string | undefined | null) {
   const parsed = Number(value || 0);
@@ -189,7 +190,7 @@ function getPortOnePublicRuntime(): CardPaymentPublicRuntime | undefined {
   };
 }
 
-function getNicePayRuntimeConfig(): NicePayRuntimeConfig {
+export function getNicePayRuntimeConfig(): NicePayRuntimeConfig {
   const mid = String(process.env.NICEPAY_MID || '').trim();
   const merchantKey = String(process.env.NICEPAY_MERCHANT_KEY || '').trim();
 
@@ -379,12 +380,40 @@ async function requestNicePayNetCancel(params: {
   }
 }
 
+export function verifyNicePayAuthPayload(params: {
+  providerPayload: Record<string, string>;
+  orderId: string;
+  expectedAmount: number;
+}) {
+  const config = getNicePayRuntimeConfig();
+  const payload = normalizePayloadRecord(params.providerPayload);
+  const authToken = getPayloadValue(payload, ['AuthToken']);
+  const tid = getPayloadValue(payload, ['TxTid']);
+  const mid = getPayloadValue(payload, ['MID']);
+  const orderId = getPayloadValue(payload, ['Moid']);
+  const amountText = getPayloadValue(payload, ['Amt']);
+  const signature = getPayloadValue(payload, ['Signature']);
+  const payMethod = getPayloadValue(payload, ['PayMethod']);
+  if (getPayloadValue(payload, ['AuthResultCode']) !== '0000' || !authToken || !tid ||
+      !mid || mid !== config.mid || orderId !== params.orderId ||
+      !amountText || !/^[0-9]+$/.test(amountText) || Number(amountText) !== params.expectedAmount ||
+      payMethod !== 'CARD' || !signature ||
+      signature !== sha256Hex(`${authToken}${mid}${amountText}${config.merchantKey}`)) {
+    throw new Error('NICEPAY 인증 증거의 TID, MID, 주문번호, 금액 또는 서명이 일치하지 않습니다.');
+  }
+  if (!isAllowedNicePayApiUrl(getPayloadValue(payload, ['NextAppURL']))) {
+    throw new Error('NICEPAY 승인 URL이 유효하지 않습니다.');
+  }
+  return { tid, mid, orderId, amount: Number(amountText) };
+}
+
 async function verifyNicePayApprovedPayment(
   params: VerifyApprovedCardPaymentParams
 ): Promise<VerifiedCardPayment> {
   assertNicePayApprovalNotRetired(params.orderId);
   const config = getNicePayRuntimeConfig();
   const providerPayload = normalizePayloadRecord(params.providerPayload);
+  const authenticated = verifyNicePayAuthPayload({ providerPayload, orderId: params.orderId, expectedAmount: params.expectedAmount });
   const authResultCode = getPayloadValue(providerPayload, ['AuthResultCode']);
   const authToken = getPayloadValue(providerPayload, ['AuthToken']);
   const txTid = getPayloadValue(providerPayload, ['TxTid', 'TID']) || params.approvalId;
@@ -503,7 +532,9 @@ async function verifyNicePayApprovedPayment(
     );
   }
 
-  if (approvedOrderId && approvedOrderId !== params.orderId) {
+  if (approvedTransactionId !== authenticated.tid ||
+      getPayloadValue(parsed, ['MID']) !== authenticated.mid ||
+      !approvedOrderId || approvedOrderId !== params.orderId) {
     throw new Error('NICEPAY 승인 주문번호가 예약과 일치하지 않습니다.');
   }
 
@@ -511,11 +542,14 @@ async function verifyNicePayApprovedPayment(
     throw new Error('NICEPAY 승인 금액이 예약 금액과 일치하지 않습니다.');
   }
 
-  if (approvedPayMethod && approvedPayMethod.toUpperCase() !== 'CARD') {
+  if (approvedPayMethod !== 'CARD') {
     throw new Error('NICEPAY 승인 응답이 카드 결제가 아닙니다.');
   }
 
-  if (approvalSignature) {
+  if (!approvalSignature) {
+    throw new Error('NICEPAY 승인 응답 서명이 없습니다.');
+  }
+  {
     const expectedApprovalSignature = sha256Hex(
       `${approvedTransactionId}${config.mid}${approvalSignatureAmount}${config.merchantKey}`
     );
@@ -553,6 +587,7 @@ async function queryNicePayTransactionStatus(
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: requestBody.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
@@ -570,11 +605,18 @@ async function queryNicePayTransactionStatus(
     );
   }
 
-  if (!status || !NICEPAY_STATUS_QUERY_SUCCESS_STATUS.has(status)) {
-    throw new Error('NICEPAY 거래 상태가 승인 완료가 아닙니다.');
+  if (getPayloadValue(parsed, ['TID']) !== providerTransactionId || !status || !['0', '1', '9'].includes(status)) {
+    throw new Error('NICEPAY 거래조회 TID 또는 상태가 올바르지 않습니다.');
   }
 
   return parsed;
+}
+
+export async function queryNicePayPaymentState(providerTransactionId: string): Promise<NicePayPaymentState> {
+  const tid = String(providerTransactionId || '').trim();
+  if (!tid) throw new Error('NICEPAY 조회 TID가 없습니다.');
+  const result = await queryNicePayTransactionStatus(tid);
+  return result.Status === '0' ? 'approved' : result.Status === '1' ? 'cancelled' : 'missing';
 }
 
 async function verifyNicePayNotification(
@@ -614,6 +656,15 @@ async function verifyNicePayNotification(
   }
 
   const statusResult = await queryNicePayTransactionStatus(providerTransactionId);
+  if (statusResult.Status !== '0') {
+    throw new Error('NICEPAY 통보 거래가 승인 완료 상태가 아닙니다.');
+  }
+  const config = getNicePayRuntimeConfig();
+  if (getPayloadValue(notification.payload, ['MID']) !== config.mid ||
+      getPayloadValue(notification.payload, ['Moid', 'MOID']) !== params.orderId ||
+      Number(getPayloadValue(notification.payload, ['Amt'])) !== params.expectedAmount) {
+    throw new Error('NICEPAY 통보 MID, 주문번호 또는 금액이 예약과 일치하지 않습니다.');
+  }
 
   return {
     provider: 'nicepay',

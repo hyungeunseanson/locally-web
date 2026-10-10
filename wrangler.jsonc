@@ -86,7 +86,8 @@
         "EXPERIENCE_COMPLETION_SCHEDULED_ENABLED": "false",
         "SERVICE_COMPLETION_SCHEDULED_ENABLED": "false",
         "CANCEL_PENDING_BOOKINGS_SCHEDULED_ENABLED": "false",
-        "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED": "false"
+        "OPS_ANOMALY_MONITOR_SCHEDULED_ENABLED": "false",
+        "NICEPAY_RECOVERY_SCHEDULED_ENABLED": "true"
       },
       "observability": {
         "enabled": true,

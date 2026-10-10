@@ -4,7 +4,7 @@ import {
   claimExperiencePaymentAtomic,
   ExperiencePaymentContractError,
 } from '@/app/utils/bookings/experiencePaymentClaims';
-import { getCurrentCardPaymentProvider } from '@/app/utils/payments/card/server';
+import { getCurrentCardPaymentProvider, getNicePayRuntimeConfig } from '@/app/utils/payments/card/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -27,12 +27,14 @@ export async function POST(request: Request) {
     }
 
     const provider = getCurrentCardPaymentProvider();
+    const supabaseAdmin = createAdminClient();
     const claim = await claimExperiencePaymentAtomic({
-      supabaseAdmin: createAdminClient(),
+      supabaseAdmin,
       bookingId: orderId,
       userId: user.id,
       provider,
       providerReference: orderId,
+      nicepayMid: provider === 'nicepay' ? getNicePayRuntimeConfig().mid : undefined,
     });
 
     if (claim.outcome !== 'claimed' && claim.outcome !== 'already_claimed') {

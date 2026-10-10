@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 
 import { finalizeExperienceCardPayment } from '@/app/api/payment/experienceCardConfirmation';
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
-import { getCurrentCardPaymentProvider, verifyApprovedCardPayment } from '@/app/utils/payments/card/server';
+import { PHASE2_SAFE_RELEASE_REASON } from '@/app/utils/payments/card/nicepayRecovery';
+import { getCurrentCardPaymentProvider, queryNicePayPaymentState, verifyApprovedCardPayment, verifyNicePayAuthPayload } from '@/app/utils/payments/card/server';
+import { beginNicePayApproval, observeNicePayAuth } from '@/app/utils/payments/card/nicepayRecovery';
 import { captureServerException } from '@/app/utils/monitoring/sentry';
+import type { VerifiedCardPayment } from '@/app/utils/payments/card/types';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
+import { isTargetedNicePayCloseout } from '@/app/utils/payments/card/targetedCloseoutTargets';
 
 type BookingNicePayCallbackBody = {
   providerPayload?: Record<string, unknown>;
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
     const isExplicitReleasedCardHold =
       String(originalBooking.status || '').toLowerCase() === 'cancelled' &&
       !originalBooking.tid &&
-      originalBooking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON;
+      [EXPLICIT_CARD_CHECKOUT_CANCEL_REASON, PHASE2_SAFE_RELEASE_REASON].includes(String(originalBooking.cancel_reason || ''));
     const isPaidLike = ['paid', 'confirmed', 'completed'].includes(
       String(originalBooking.status || '').toLowerCase()
     );
@@ -117,25 +121,78 @@ export async function POST(request: Request) {
     const expectedOrderId = originalBooking.order_id || originalBooking.id;
     const expectedAmount = Number(originalBooking.amount || 0);
 
-    let verificationResult;
+    let verificationResult: VerifiedCardPayment | undefined;
+    let approvalGateStarted = false;
     try {
       const storedProvider = String(originalBooking.payment_provider || '').toLowerCase();
       const provider = storedProvider === 'nicepay' || storedProvider === 'portone'
         ? storedProvider
         : getCurrentCardPaymentProvider();
-      verificationResult = await verifyApprovedCardPayment({
-        provider,
-        approvalId: impUid,
-        orderId: expectedOrderId,
-        expectedAmount,
-        providerPayload,
-      });
+      if (provider === 'nicepay' && !isTargetedNicePayCloseout(expectedOrderId)) {
+        const auth = verifyNicePayAuthPayload({
+          providerPayload, orderId: expectedOrderId, expectedAmount,
+        });
+        const { data: durableAttempt, error: attemptError } = await supabaseAdmin
+          .from('experience_nicepay_recovery').select('booking_id')
+          .eq('booking_id', originalBooking.id).maybeSingle();
+        if (attemptError) throw attemptError;
+        if (!durableAttempt) {
+          // A claim made by the previous Worker may finish during rollout.
+          // Never start another approval without the durable Phase 2 gate.
+          const state = await queryNicePayPaymentState(auth.tid);
+          if (state !== 'approved') {
+            return NextResponse.json({ success: false,
+              error: '이전 배포에서 시작한 결제 상태를 확인 중입니다. 다시 결제하지 마세요.' }, { status: 503 });
+          }
+          verificationResult = {
+            provider: 'nicepay', approvedAmount: expectedAmount,
+            providerTransactionId: auth.tid, raw: { recoveryStatusQuery: 'approved' },
+          };
+        } else if ((isPaidLike && originalBooking.tid === auth.tid) ||
+            (isExplicitReleasedCardHold && originalBooking.cancel_reason === PHASE2_SAFE_RELEASE_REASON)) {
+          const state = await queryNicePayPaymentState(auth.tid);
+          if (state !== 'approved') throw new Error('완료된 예약과 NICEPAY 상태가 일치하지 않습니다.');
+          verificationResult = {
+            provider: 'nicepay', approvedAmount: expectedAmount,
+            providerTransactionId: auth.tid, raw: { recoveryStatusQuery: 'approved' },
+          };
+        } else {
+          await observeNicePayAuth({
+            client: supabaseAdmin, bookingId: originalBooking.id,
+            orderId: expectedOrderId, tid: auth.tid, mid: auth.mid, amount: auth.amount,
+          });
+          const gate = await beginNicePayApproval({
+            client: supabaseAdmin, bookingId: originalBooking.id, tid: auth.tid,
+          });
+          if (gate !== 'started') {
+            const state = await queryNicePayPaymentState(auth.tid);
+            if (state !== 'approved') {
+              return NextResponse.json({ success: false, error: '승인 상태를 확인 중입니다. 다시 결제하지 마세요.' }, { status: 503 });
+            }
+            verificationResult = {
+              provider: 'nicepay', approvedAmount: expectedAmount,
+              providerTransactionId: auth.tid, raw: { recoveryStatusQuery: 'approved' },
+            };
+          } else {
+            approvalGateStarted = true;
+          }
+        }
+      }
+      if (!verificationResult) {
+        verificationResult = await verifyApprovedCardPayment({
+          provider,
+          approvalId: impUid,
+          orderId: expectedOrderId,
+          expectedAmount,
+          providerPayload,
+        });
+      }
     } catch (verificationError) {
       const message =
         verificationError instanceof Error
           ? verificationError.message
           : '카드 결제 승인 검증에 실패했습니다.';
-      return NextResponse.json({ success: false, error: message }, { status: 400 });
+      return NextResponse.json({ success: false, error: approvalGateStarted ? '승인 결과 확인 중입니다. 다시 결제하지 마세요.' : message }, { status: approvalGateStarted ? 503 : 400 });
     }
 
     const confirmationResult = await finalizeExperienceCardPayment({

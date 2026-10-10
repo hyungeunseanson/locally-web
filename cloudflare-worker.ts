@@ -48,6 +48,7 @@ import {
   handleOpsAnomalyMonitorScheduled,
   type OpsAnomalyMonitorScheduledRuntimeEnv,
 } from './app/utils/opsAnomalyMonitorScheduled';
+import { handleNicePayRecoveryScheduled } from './app/utils/payments/card/nicepayRecoveryScheduled';
 
 type WorkerEnvironment = PublicExperienceMediaQueueRuntimeEnv & ExperienceTranslationQueueRuntimeEnv & HomePopularitySnapshotRuntimeEnv & AdminSupportUnreadAlertsRuntimeEnv & NotificationRetentionRuntimeEnv & ExperienceCompletionScheduledRuntimeEnv & ServiceCompletionScheduledRuntimeEnv & CancelPendingBookingsScheduledRuntimeEnv & OpsAnomalyMonitorScheduledRuntimeEnv & { CF_VERSION_METADATA?: { id: string } };
 
@@ -83,6 +84,7 @@ const worker = {
       runServiceCompletionSync: handleServiceCompletionScheduled,
       runCancelPendingBookings: handleCancelPendingBookingsScheduled,
       runOpsAnomalyMonitor: handleOpsAnomalyMonitorScheduled,
+      runNicePayRecovery: handleNicePayRecoveryScheduled,
       delegate: typeof scheduled === 'function'
         ? (nextController, nextEnv) => scheduled.call(openNextWorker, nextController, nextEnv, ctx)
         : undefined,

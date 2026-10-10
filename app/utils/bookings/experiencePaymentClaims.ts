@@ -63,9 +63,20 @@ export async function claimExperiencePaymentAtomic(params: {
   userId: string;
   provider: ExperiencePaymentProvider;
   providerReference?: string | null;
+  nicepayMid?: string;
 }) {
+  if (params.provider === 'nicepay' && !params.nicepayMid) {
+    throw new ExperiencePaymentContractError(500, 'NICEPAY_RECOVERY_MID_MISSING');
+  }
   const { data, error } = await params.supabaseAdmin
-    .rpc('claim_experience_payment_atomic', {
+    .rpc(params.provider === 'nicepay'
+      ? 'claim_experience_nicepay_with_recovery_atomic'
+      : 'claim_experience_payment_atomic', params.provider === 'nicepay' ? {
+      p_booking_id: params.bookingId,
+      p_user_id: params.userId,
+      p_order_id: params.providerReference || null,
+      p_mid: params.nicepayMid,
+    } : {
       p_booking_id: params.bookingId,
       p_user_id: params.userId,
       p_provider: params.provider,

@@ -116,7 +116,7 @@ const ko: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '무통장 입금은 언제까지 해야 하나요?',
-          a: '입금 마감 시간은 주문별 결제 페이지에 표시된 시간이 기준입니다. 체험은 보통 예약 후 2시간 안에 입금하지 않으면 자동 취소됩니다. 맞춤 서비스는 1시간 이내 입금을 요청드리며, 미입금 건은 현지 담당자가 확인 후 안내합니다.',
+          a: '입금 마감 시간은 주문별 결제 페이지에 표시된 시간이 기준입니다. 체험은 예약 후 12시간 안에 입금하지 않으면 자동 취소됩니다. 맞춤 서비스는 1시간 이내 입금을 요청드리며, 미입금 건은 현지 담당자가 확인 후 안내합니다.',
           searchTerms: ['입금', '무통장', '입금 마감', '입금 대기', '은행 이체'],
         },
         {
@@ -711,7 +711,7 @@ const en: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: 'How long do I have to complete a bank transfer?',
-          a: 'The deadline shown on your payment page is the rule for that order. Experiences are usually canceled after about 2 hours without payment. For custom services, please pay within 1 hour; if payment is not received, your local coordinator will review the request and contact you.',
+          a: 'The deadline shown on your payment page is the rule for that order. Experience bookings are automatically canceled after 12 hours without payment. For custom services, please pay within 1 hour; if payment is not received, your local coordinator will review the request and contact you.',
           searchTerms: ['deposit deadline', 'bank transfer deadline', 'payment pending', 'deposit'],
         },
         {
@@ -1306,7 +1306,7 @@ const ja: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '銀行振込はいつまでに行えばいいですか？',
-          a: '振込期限は、その注文の決済ページに表示された時間が基準です。体験は通常予約後2時間ほどで未入金なら自動キャンセルになります。カスタムサービスは1時間以内にお振り込みください。未入金の場合は現地担当者が確認のうえご案内します。',
+          a: '振込期限は、その注文の決済ページに表示された時間が基準です。体験は予約後12時間以内に未入金なら自動キャンセルになります。カスタムサービスは1時間以内にお振り込みください。未入金の場合は現地担当者が確認のうえご案内します。',
           searchTerms: ['入金', '振込期限', '入金待ち', '銀行振込'],
         },
         {
@@ -1901,7 +1901,7 @@ const zh: HelpFaqLocaleContent = {
         {
           id: 'bank-deadline',
           q: '银行转账最晚什么时候要完成？',
-          a: '以该订单支付页面显示的截止时间为准。体验通常在预订后约2小时未入金时自动取消。定制服务请在1小时内完成转账；若未到账，当地负责人确认后会与您联系。',
+          a: '以该订单支付页面显示的截止时间为准。体验预订后12小时未入金时自动取消。定制服务请在1小时内完成转账；若未到账，当地负责人确认后会与您联系。',
           searchTerms: ['入金', '银行转账', '截止时间', '等待入金'],
         },
         {

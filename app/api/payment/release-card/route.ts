@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { EXPLICIT_CARD_CHECKOUT_CANCEL_REASON } from '@/app/utils/bookings/pendingBookingHolds';
+import { PHASE2_SAFE_RELEASE_REASON, interruptNicePayAttempt, recoverNicePayAttempt } from '@/app/utils/payments/card/nicepayRecovery';
 import { createAdminClient } from '@/app/utils/supabase/admin';
 import { createClient as createServerClient } from '@/app/utils/supabase/server';
 
@@ -40,9 +41,14 @@ export async function POST(request: Request) {
     if (
       String(booking.status || '').toLowerCase() === 'cancelled' &&
       booking.payment_claim_state === 'released' &&
-      booking.cancel_reason === EXPLICIT_CARD_CHECKOUT_CANCEL_REASON
+      [EXPLICIT_CARD_CHECKOUT_CANCEL_REASON, PHASE2_SAFE_RELEASE_REASON].includes(String(booking.cancel_reason || ''))
     ) {
       return NextResponse.json({ success: true, alreadyReleased: true });
+    }
+
+    if (booking.payment_provider === 'nicepay' && booking.tid &&
+        ['paid', 'confirmed', 'completed'].includes(String(booking.status || '').toLowerCase())) {
+      return NextResponse.json({ success: true, confirmed: true });
     }
 
     if (booking.tid || String(booking.status || '').toUpperCase() !== 'PENDING') {
@@ -57,6 +63,21 @@ export async function POST(request: Request) {
         { success: false, error: '카드 결제 대기 예약만 해제할 수 있습니다.' },
         { status: 409 }
       );
+    }
+
+    if (booking.payment_provider === 'nicepay') {
+      const currentAttempt = await interruptNicePayAttempt({ client: supabaseAdmin, bookingId: booking.id, userId: user.id });
+      if (currentAttempt === 'confirmed') return NextResponse.json({ success: true, confirmed: true });
+      if (currentAttempt === 'released') return NextResponse.json({ success: true, released: true });
+      const outcome = await recoverNicePayAttempt({
+        client: supabaseAdmin, bookingId: booking.id, userId: user.id,
+      });
+      return NextResponse.json({
+        success: true,
+        released: outcome === 'released',
+        confirmed: outcome === 'confirmed',
+        pendingVerification: outcome === 'pending' || outcome === 'manual_review' || outcome === 'already_terminal',
+      }, { status: outcome === 'pending' || outcome === 'manual_review' || outcome === 'already_terminal' ? 202 : 200 });
     }
 
     if (

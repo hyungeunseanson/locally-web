@@ -225,7 +225,7 @@ try {
     "SELECT oid::text,pronargs FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='lease_experience_translation_task' ORDER BY pronargs",
   );
   const migrationSql = await readFile(
-    "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
+    "supabase/migrations/20261010113747_translation_queue_recovery_p1.sql",
     "utf8",
   );
   await sql(
@@ -250,7 +250,7 @@ try {
   record("installation refuses in-flight legacy leases with no partial DDL");
   await sql(
     await readFile(
-      "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
+      "supabase/migrations/20261010113747_translation_queue_recovery_p1.sql",
       "utf8",
     ),
   );
