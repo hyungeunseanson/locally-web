@@ -84,6 +84,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase: new URL(siteUrl),
+    verification: {
+      google: 'JMtJnL8COt2cbqA6UmVFT4E_jc-40iNKJwd80cW8Ah0',
+    },
     title: {
       template: '%s | Locally',
       default: title,
