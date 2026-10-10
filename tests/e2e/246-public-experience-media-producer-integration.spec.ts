@@ -700,6 +700,7 @@ test.describe('public experience media producer application integration', () => 
           operation: 'select',
           result: success(mediaRow({ status: 'pending' })),
         },
+        { table: 'experiences', operation: 'select', result: success(mediaRow({ status: 'pending' })) },
         { table: 'experiences', operation: 'update', result },
       ]);
       await expect(executeUpdateExperienceAdminStatus(42, 'active', undefined, {
@@ -711,10 +712,38 @@ test.describe('public experience media producer application integration', () => 
         buildLocalizedNotificationInsert: async () => ({} as never),
         sendImmediateGenericEmail: async () => emailResult(),
         recordAuditLog: async () => undefined,
-      })).rejects.toThrow(result.error ? 'admin update failed' : 'Experience not found');
+      })).rejects.toThrow(result.error ? 'admin update failed' : '체험이 변경되었습니다');
       expect(producer.sendAttempts).toBe(0);
       database.assertExhausted();
     }
+  });
+
+  test('admin cannot approve a ready-marked manual locale with missing body', async () => {
+    const producer = producerHarness();
+    const database = new FakeDatabase([
+      { table: 'experiences', operation: 'select', result: success(mediaRow({ status: 'pending' })) },
+      { table: 'experiences', operation: 'select', result: success(mediaRow({
+        status: 'pending', manual_locales: ['ko', 'en', 'ja'],
+        title_en: 'Seoul walking experience', description_en: 'Explore the city with a local host.',
+        title_ja: 'ソウル街歩き体験', description_ja: '現地ホストと一緒に街を歩きます。',
+        meeting_point_i18n: { ko: '서울역 1번 출구' },
+        translation_meta: {
+          en: { mode: 'manual', status: 'ready', version: 1 },
+          ja: { mode: 'manual', status: 'ready', version: 1 },
+        },
+      })) },
+    ]);
+    await expect(executeUpdateExperienceAdminStatus(42, 'active', undefined, {
+      getAdminClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'admin-1' } } }) } }),
+      createAdminClient: () => asAdminClient(database),
+      scheduleMediaProducer: producer.schedule,
+      buildLocalizedNotificationInsert: async () => ({} as never),
+      sendImmediateGenericEmail: async () => emailResult(),
+      recordAuditLog: async () => undefined,
+    })).rejects.toThrow('선택한 언어(en)의 번역을 보완');
+    expect(database.calls.some((call) => call.operation === 'update')).toBe(false);
+    expect(producer.sendAttempts).toBe(0);
+    database.assertExhausted();
   });
 
   test('admin status action sends only for an actually public-active returned row', async () => {
@@ -732,6 +761,9 @@ test.describe('public experience media producer application integration', () => 
           operation: 'select',
           result: success(mediaRow({ status: 'pending' })),
         },
+        ...(['active', 'approved'].includes(scenario.status)
+          ? [{ table: 'experiences' as const, operation: 'select' as const, result: success(mediaRow({ status: 'pending' })) }]
+          : []),
         {
           table: 'experiences',
           operation: 'update',
@@ -757,6 +789,10 @@ test.describe('public experience media producer application integration', () => 
         recordAuditLog: async () => undefined,
       });
       expect(result).toEqual({ success: true });
+      if (['active', 'approved'].includes(scenario.status)) {
+        expect(database.filters).toContainEqual({ table: 'experiences', operation: 'update', column: 'translation_version', value: 1 });
+        expect(database.filters).toContainEqual({ table: 'experiences', operation: 'update', column: 'status', value: 'pending' });
+      }
       await producer.settle();
       expect(producer.sendAttempts, scenario.status).toBe(scenario.expectedSends);
       database.assertExhausted();
