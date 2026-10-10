@@ -33,7 +33,7 @@ rows. A failed precondition rolls back all installation work. The existing
 migration ledger, historical baseline, financial SQL and Runtime files are not
 modified or replayed in Production. No historical row repair is installed.
 The SQL advances versions only later when a normal Worker wake reclaims work.
-Existing provider limits and both public lease overload return shapes remain.
+Existing provider limits, public RPC object IDs/dependencies and both lease overload return shapes remain. Superseded source-version tasks are cancelled on normal recovery wakes and excluded from dispatch, so they cannot starve current work.
 
 Run:
   TRANSLATION_PG17_MODULES=<pinned-tooling>/node_modules \

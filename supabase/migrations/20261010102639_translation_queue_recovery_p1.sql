@@ -75,7 +75,10 @@ BEGIN
  IF changed AND NOT body_changed AND failure_only THEN RETURN NEW; END IF;
  SELECT * INTO t FROM public.experience_translation_tasks WHERE experience_id=OLD.id
   AND translation_version=OLD.translation_version AND status IN ('leased','processing')
-  AND lease_expires_at>clock_timestamp() ORDER BY id LIMIT 1 FOR UPDATE;
+  AND lease_expires_at>clock_timestamp()
+  AND NEW.translation_meta->target_locale->>'status'='ready'
+  AND (NEW.translation_meta->target_locale->>'version')::integer=translation_version
+  ORDER BY id LIMIT 1 FOR UPDATE;
  IF NOT FOUND THEN
   IF NOT changed THEN RETURN NEW; END IF;
   RAISE EXCEPTION 'translation_active_lease_required' USING ERRCODE='40001';
@@ -128,9 +131,21 @@ DECLARE e public.experiences%ROWTYPE; next_version integer; new_job uuid; old_jo
 BEGIN
  -- Bound each wake; lock experiences before tasks, same order as finalization.
  FOR e IN SELECT x.* FROM public.experiences x WHERE EXISTS(
-  SELECT 1 FROM public.experience_translation_tasks t WHERE t.experience_id=x.id AND t.translation_version=x.translation_version
-   AND ((t.status IN ('leased','processing') AND t.lease_expires_at<=clock_timestamp()) OR t.status='retryable'))
+  SELECT 1 FROM public.experience_translation_tasks t WHERE t.experience_id=x.id
+   AND ((t.translation_version<x.translation_version AND t.status IN ('queued','leased','processing','retryable'))
+    OR (t.translation_version=x.translation_version AND ((t.status IN ('leased','processing') AND t.lease_expires_at<=clock_timestamp()) OR t.status='retryable'))))
  ORDER BY x.id LIMIT 16 FOR UPDATE OF x SKIP LOCKED LOOP
+  -- A source edit supersedes old work; do not leave a stale first row blocking
+  -- current dispatch, or rotate the newer source merely to cancel an old task.
+  FOR old_job IN SELECT DISTINCT job_id FROM public.experience_translation_tasks
+   WHERE experience_id=e.id AND translation_version<e.translation_version
+    AND status IN ('queued','leased','processing','retryable') ORDER BY job_id LOOP
+   UPDATE public.experience_translation_tasks SET status='cancelled',completed_at=now(),lease_expires_at=NULL,last_error='superseded_by_source_version'
+    WHERE job_id=old_job AND translation_version<e.translation_version AND status IN ('queued','leased','processing','retryable');
+   PERFORM private.translation_sync_job(old_job);
+  END LOOP;
+  IF NOT EXISTS(SELECT 1 FROM public.experience_translation_tasks t WHERE t.experience_id=e.id AND t.translation_version=e.translation_version
+   AND ((t.status IN ('leased','processing') AND t.lease_expires_at<=clock_timestamp()) OR t.status='retryable')) THEN CONTINUE; END IF;
   next_version:=greatest(e.translation_version,coalesce((SELECT max(translation_version) FROM public.experience_translation_jobs WHERE experience_id=e.id),0))+1;
   -- New version fences a late legacy experience PATCH; fresh task IDs fence its
   -- unqualified task PATCH. Preserve terminal tasks as historical evidence.
@@ -197,7 +212,7 @@ BEGIN
  FOR p IN SELECT oid,oidvectortypes(proargtypes) AS args FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='lease_experience_translation_task' LOOP
   d:=pg_get_functiondef(p.oid);
   d:=replace(d,'AND experience_translation_tasks.not_before <= p_now',
-   'AND experience_translation_tasks.not_before <= p_now AND NOT EXISTS (SELECT 1 FROM public.experience_translation_tasks active WHERE active.experience_id=experience_translation_tasks.experience_id AND active.status IN (''leased'',''processing'') AND active.lease_expires_at>clock_timestamp())');
+   'AND experience_translation_tasks.not_before <= p_now AND EXISTS (SELECT 1 FROM public.experiences current_source WHERE current_source.id=experience_translation_tasks.experience_id AND current_source.translation_version=experience_translation_tasks.translation_version) AND NOT EXISTS (SELECT 1 FROM public.experience_translation_tasks active WHERE active.experience_id=experience_translation_tasks.experience_id AND active.status IN (''leased'',''processing'') AND active.lease_expires_at>clock_timestamp())');
   IF d=pg_get_functiondef(p.oid) THEN RAISE EXCEPTION 'translation_lease_source_contract_changed'; END IF;
   d:=replace(d,'FUNCTION public.lease_experience_translation_task(', 'FUNCTION private.lease_experience_translation_task(');
   IF to_regprocedure('private.lease_experience_translation_task('||p.args||')') IS NOT NULL THEN

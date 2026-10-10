@@ -411,6 +411,21 @@ try {
     "Latest source",
   );
   record("newer source version protected");
+  await sql(
+    "WITH j AS (INSERT INTO public.experience_translation_jobs(experience_id,translation_version,source_locale) VALUES(42,2,'ko') RETURNING id) INSERT INTO public.experience_translation_tasks(job_id,experience_id,translation_version,source_locale,target_locale,provider) SELECT id,42,2,'ko','en','gemini' FROM j",
+  );
+  const currentSourceTask = await lease();
+  assert.equal(currentSourceTask.translation_version, 2);
+  assert.equal((await row(t.id)).status, "cancelled");
+  assert.equal(
+    (await sql("SELECT translation_version FROM experiences"))[0]
+      .translation_version,
+    2,
+  );
+  record(
+    "superseded task cancels without blocking or rotating current source work",
+  );
+
   await reset();
   await sql(
     "ALTER TABLE public.experiences DISABLE TRIGGER translation_legacy_finalize_p1;UPDATE public.experiences SET manual_locales=ARRAY['en'],title_en='Manual title',description_en='Manual description' WHERE id=42;ALTER TABLE public.experiences ENABLE TRIGGER translation_legacy_finalize_p1",
