@@ -18,7 +18,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run --detach --name "$source_container" \
+"$repo_root/scripts/backup/pull-pinned-image.sh" "$postgres_image"
+
+docker run --pull=never --detach --name "$source_container" \
   --network none \
   -e POSTGRES_PASSWORD=postgres \
   "$postgres_image" >/dev/null
@@ -138,6 +140,7 @@ echo "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377  $fixture
   | sha256sum --check --strict
 tar -xzf "$fixture_root/age.tar.gz" -C "$tools_dir"
 export PATH="$tools_dir/age:$PATH"
+python3 "$repo_root/scripts/backup/storage_age_rehearsal.py"
 
 identity="$fixture_root/test.agekey"
 age-keygen --output "$identity" >/dev/null 2>&1

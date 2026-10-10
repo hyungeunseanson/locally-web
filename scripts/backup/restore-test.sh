@@ -43,7 +43,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run --detach --name "$restore_container" \
+"$script_dir/pull-pinned-image.sh" "$postgres_image"
+
+docker run --pull=never --detach --name "$restore_container" \
   --network none \
   -e POSTGRES_PASSWORD=postgres \
   "$postgres_image" >/dev/null

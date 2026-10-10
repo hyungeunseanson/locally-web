@@ -115,19 +115,20 @@ jobs:
             : > "$backup_dir/history_data.sql"
           fi
 
-          docker run --rm \
+          "$GITHUB_WORKSPACE/scripts/backup/pull-pinned-image.sh" "$SUPABASE_POSTGRES_IMAGE"
+          docker run --pull=never --rm \
             "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=pre-data \
             > "$backup_dir/managed-auth-storage-pre.sql"
-          docker run --rm \
+          docker run --pull=never --rm \
             "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner \
             --schema=auth --schema=storage \
             --section=post-data \
             > "$backup_dir/managed-auth-storage.sql"
-          docker run --rm \
+          docker run --pull=never --rm \
             "$SUPABASE_POSTGRES_IMAGE" \
             pg_dump "$SUPABASE_DB_URL" --format=custom \
             --exclude-table-data=storage.buckets_vectors \

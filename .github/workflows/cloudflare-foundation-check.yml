@@ -54,6 +54,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Preflight cross-domain contract drift without Production credentials
+        run: npm run test:contract-preflight
+
       - name: Validate Supabase API-key transport and privileged binding compatibility
         run: npm run test:supabase-api-keys
 
