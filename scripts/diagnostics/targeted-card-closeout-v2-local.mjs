@@ -45,6 +45,8 @@ try{
  await c.query('CREATE TRIGGER bookings_money_transition_authority BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION private.guard_booking_money_transition();CREATE TRIGGER bookings_payment_claim_columns_server_only BEFORE INSERT OR UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION guard_experience_payment_claim_columns();');
  const migration=await readFile(root+'/docs/financial/installed/20261009035059_targeted_nicepay_ab_closeout.sql','utf8');
  await c.query(migration);
+ // The synthetic C booking now passes through the ordinary PHASE 2 proof gate.
+ await c.query(await readFile(root+'/supabase/migrations/20261011000100_experience_nicepay_recovery.sql','utf8'));
  // Install the existing cancellation/payout authorities verbatim; no substitute locks.
  const financialSql=await readFile(root+'/supabase/migrations/20261005104924_solo_guarantee_financial_authority.sql','utf8');
  const dueStart=financialSql.indexOf('CREATE OR REPLACE FUNCTION private.solo_refund_due(');
