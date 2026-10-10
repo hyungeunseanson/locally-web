@@ -249,15 +249,15 @@ expectedLedger.push({
   "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a",
   "ledgerStatementsSha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
 });
+expectedLedger.push({
+  "version": "20261010113747",
+  "name": "translation_queue_recovery_p1",
+  "repositoryVersion": "20261010113747",
+  "repositoryFile": "supabase/migrations/20261010113747_translation_queue_recovery_p1.sql",
+  "repositorySha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce",
+  "ledgerStatementsSha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce"
+});
 const expectedPendingMigrations = [
-  {
-    "version": "20261010102639",
-    "name": "translation_queue_recovery_p1",
-    "repositoryFile": "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
-    "repositorySha256": "43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce",
-    "status": "approval_required",
-    "automaticProductionApply": false
-  },
   {
     "version": "20261011000100",
     "name": "experience_nicepay_recovery",

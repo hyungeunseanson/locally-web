@@ -45,7 +45,8 @@ BEGIN
     '20261006133015:admin_chat_canonical_recency',
     '20261006180321:community_freeze_safeupdate',
     '20261007024725:admin_chat_monitor_canonical_recency',
-    '20261007061059:solo_refund_provider_ledger_reconciliation'
+    '20261007061059:solo_refund_provider_ledger_reconciliation',
+    '20261010113747:translation_queue_recovery_p1'
   ]::text[];
   IF actual IS DISTINCT FROM expected THEN
     RAISE EXCEPTION 'migration ledger mismatch: %', actual;
@@ -1831,5 +1832,14 @@ BEGIN
   SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version) INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261007061059';
   IF actual IS DISTINCT FROM ARRAY['20261007061059:solo_refund_provider_ledger_reconciliation:1:081d2c6304bf00b0269d5e190d091bcf:68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a']::text[] THEN RAISE EXCEPTION 'Solo ledger applied SQL mismatch'; END IF;
 END $solo_ledger_reconciliation_ledger_contract$;
+
+DO $translation_recovery_ledger_contract$
+DECLARE actual text[];
+BEGIN
+  SELECT array_agg(version||':'||name||':'||cardinality(statements)||':'||md5(statements[1])||':'||encode(sha256(convert_to(statements[1],'UTF8')),'hex') ORDER BY version)
+    INTO actual FROM supabase_migrations.schema_migrations WHERE version='20261010113747';
+  IF actual IS DISTINCT FROM ARRAY['20261010113747:translation_queue_recovery_p1:1:fd5b220dae5cc1bfccc1e42b5e4d4f22:43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce']::text[]
+    THEN RAISE EXCEPTION 'Translation recovery ledger SQL mismatch'; END IF;
+END $translation_recovery_ledger_contract$;
 
 ROLLBACK;
