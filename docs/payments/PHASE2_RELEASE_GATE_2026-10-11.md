@@ -2,7 +2,7 @@
 
 ## 결론
 
-**운영 적용 중단.** 이번 조사에서 실제 금융 사고는 확인되지 않았지만, A/B 사후 NICEPAY 거래대사 완료와 운영 DB Migration 일치가 검증되지 않았다. 승인된 연속 출시의 필수 Gate가 충족될 때까지 운영 Migration, PR Merge, Worker 전환, Cron 활성화는 실행하지 않는다.
+**세 운영 Gate PASS, 최종 CI 대기.** A/B의 NICEPAY 운영 MID 사후 거래대사, 번역 Migration 버전 정합화, 새 운영 백업의 격리 복원·R2 검증을 마쳤다. 최종 PR Head의 필수 CI가 모두 통과하면 승인된 운영 Migration, PR Merge, Worker 전환, Cron 활성화 순서로 진행한다.
 
 ## Fresh 운영 조회
 
@@ -11,13 +11,13 @@
 | GitHub main | `905bb105187118d99e4d4a961f77a47512c04f49` (`git ls-remote origin`) |
 | 배포 Worker | `fdc729a3-fb86-4c29-ad66-bafcd38727cb` 100%, 버전 메모 소스 `905bb105…` (`wrangler deployments status --env production`) |
 | Production DB | `20261011000100_experience_nicepay_recovery` 미적용. 복구 원장/RPC 미존재 (Supabase migration list 및 `to_regclass`/`to_regprocedure`) |
-| Migration 차이 | Production은 `20261010113747_translation_queue_recovery_p1` 적용. main은 `20261010102639_translation_queue_recovery_p1`을 미적용으로 기록. 동일한 이름의 서로 다른 버전이며 기능/스키마 동일성은 미확인. 범위 외 Migration을 자동 적용하면 안 된다. |
+| Migration 차이 | Production `20261010113747_translation_queue_recovery_p1`의 저장된 SQL MD5 `fd5b220dae5cc1bfccc1e42b5e4d4f22`가 저장소 파일과 정확히 일치한다. SHA-256 `43e07bbf2f3d9a6b37b6a3e51430797e89acf3ac646b04e8e8d8b3285fb122ce`도 일치한다. 운영 RLS 영수증 테이블, 함수 6개, 활성 트리거 3개, service_role 전용 공개 RPC 3개, anon/service_role 테이블 직접 조회 거부를 확인했다. PR에서 파일명을 실제 운영 버전으로 변경하고 pending 목록에서 제거했다. 운영 SQL 재실행 없음. |
 | A/B | 두 예약 모두 `cancelled`/`released`, TID 없음, 환불액·호스트 정산액·플랫폼 수익 0원. `private.targeted_card_closeouts` 2건. |
 | C | `PAID`/`completed`, TID 존재, 금액 46,200원, 호스트 정산액 33,600원, 플랫폼 수익 12,600원, 환불액 0원. |
-| A/B PG 증거 | 종료 원장의 마지막 NICEPAY 확인 시각은 2026-10-09 16:09:00 UTC. 당시 승인 내역 없음으로 기록됐고 `operational_incomplete_with_residual_risk`, `residual_legacy_risk_accepted=true`로 종료. **이후의 독립적인 NICEPAY 거래대사 완료 증거는 확보하지 못함.** |
-| 백업·복구 | Supabase 대시보드의 예약 물리 백업 7개와 Restore 경로를 확인. 표시된 최신 백업은 2026-10-09 20:43:33 UTC. PITR은 미활성(추가 기능 안내). 배포 직전 새 백업 및 실제 복구 가능 시점 검증은 미실행. |
+| A/B PG 증거 | 2026-10-10 17:05 UTC NICEPAY 운영 가맹점 관리자 `FIsonnerdm`의 통합거래조회에서 거래일자 2026/10/08~2026/10/11, 주문번호별, 모든 상태·결제서비스로 직접 조회. A/B 각각 승인 0건·취소 0건·거래 행 0건. PHASE 1 원장 확인 시각(2026-10-09 16:09 UTC) 이후 새 금융 거래는 없었다. C는 카드 승인 1건·46,200원, 취소 0건이며 상세 TID가 DB와 정확히 일치했다. C 승인일 2026/10/09, 승인매입일 2026/10/10, 정산 예정일 2026/10/20로 표시됐다. |
+| 백업·복구 | [운영 백업 실행 38069534146](https://github.com/hyungeunseanson/locally-web/actions/runs/38069534146) 성공. 2026-10-10 16:54:37 UTC 시작, 격리 Postgres 17에 복원해 데이터 건수·권한·보안 객체·Realtime 구성을 비교하고 `RESTORE_COUNTS_SECURITY_OBJECTS_AND_REALTIME_PASS` 확인. R2 `daily/2026-10-10T16-54-37Z-38069534146-1/`에 age 암호화 백업 및 SHA-256 저장, 재다운로드 체크섬 검증 성공. 원본 기존 백업은 보존. |
 
-NICEPAY 가맹점 관리자 URL에 접근했으나 로그인된 거래조회 화면을 확보하지 못했다. 기존 DB 종료 증거를 새로운 PG 조회로 대체하지 않았다.
+NICEPAY 공식 문서가 지정한 `npg.nicepay.co.kr`에 운영 계정으로 로그인해 거래를 직접 재조회했다. 거래가 없는 A/B에는 승인·취소·정산 대상 TID도 없고, C의 승인·매입·정산 예정 및 TID는 운영 DB와 일치한다. 결제 취소·환불 버튼은 사용하지 않았다.
 
 ## 코드 수정과 격리 검증
 
@@ -28,9 +28,6 @@ NICEPAY 가맹점 관리자 URL에 접근했으나 로그인된 거래조회 화
 
 ## 해제해야 할 Gate
 
-1. NICEPAY 관리자에서 A/B 주문번호의 종료 이후 현재까지 승인·취소·환불·입금 기록을 직접 재조회하고, 결과와 확인 시각을 보존한다. 이상이 있으면 사건 처리를 우선한다.
-2. Production의 번역 Migration 버전 차이가 저장소 계획과 어떤 관계인지 확인하고, 필요하면 별도 승인된 정합성 작업으로 맞춘다. PHASE 2 Migration 외의 pending migration을 자동 적용하지 않는다.
-3. 운영 DB의 배포 직전 최신 백업을 확보하고, 복구 가능한 시점과 실제 복구 절차를 확인한다. 현재 보이는 물리 백업은 출시 직전 지점이 아니며 PITR은 비활성이다.
-4. 새 PR Head의 필수 CI가 모두 통과했는지 확인한다. 이후에만 사전 금융 지문 보존 → PHASE 2 Migration 정확히 1회 → DB ACL/금융 불변 확인 → Merge → Merge SHA 기반 Worker 배포 → 100%/Cron/비금융 점검 순으로 진행한다.
+1. 새 PR Head의 필수 CI가 모두 통과했는지 확인한다. 이후에만 사전 금융 지문 보존 → PHASE 2 Migration 정확히 1회 → DB ACL/금융 불변 확인 → Merge → Merge SHA 기반 Worker 배포 → 100%/Cron/비금융 점검 순으로 진행한다.
 
 이 문서는 운영 변경 실행 기록이 아니다. 운영 결제·환불·취소 API 호출과 고객 예약 데이터 변경은 하지 않았다.
