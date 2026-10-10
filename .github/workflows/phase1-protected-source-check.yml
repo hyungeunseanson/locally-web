@@ -34,6 +34,11 @@ jobs:
           TARGETED_LEGACY_REVISION: e4933ce1c00707b792e69911a0791726a6a7e956
           LOCAL_POSTGREST_BINARY: ${{ runner.temp }}/postgrest
         run: node scripts/diagnostics/targeted-card-closeout-v2-local.mjs --runtime "$RUNNER_TEMP/phase1-pg17"
+      - name: Translation recovery, rollback and Cron database races (PG17/PostgREST)
+        env:
+          TRANSLATION_PG17_MODULES: ${{ runner.temp }}/phase1-pg17/node_modules
+          TRANSLATION_POSTGREST: ${{ runner.temp }}/postgrest
+        run: node tests/integration/translation-recovery/native.mjs
       - name: Verify actual helpers in isolated workerd
         run: node scripts/diagnostics/targeted-card-closeout-worker.mjs
       - name: Verify monitoring, admin notification and cooldown contracts

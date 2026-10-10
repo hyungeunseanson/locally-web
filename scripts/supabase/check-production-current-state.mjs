@@ -249,7 +249,16 @@ expectedLedger.push({
   "repositorySha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a",
   "ledgerStatementsSha256": "68cadb7616e1d309bdf459e11d342dfedaccfaba81d8d677e408ae30cf6d6e6a"
 });
-const expectedPendingMigrations = [];
+const expectedPendingMigrations = [
+  {
+    "version": "20261010102639",
+    "name": "translation_queue_recovery_p1",
+    "repositoryFile": "supabase/migrations/20261010102639_translation_queue_recovery_p1.sql",
+    "repositorySha256": "4daaed60105c4a32575a8de52cd55f77b788b6697c49fb7b46d73d1ea8cae5fc",
+    "status": "approval_required",
+    "automaticProductionApply": false
+  }
+];
 exact('migration versions', manifest.migrationLedger.map(({ version }) => version), expectedLedger.map(({ version }) => version));
 for (const [index, expected] of expectedLedger.entries()) {
   const actual = manifest.migrationLedger[index];

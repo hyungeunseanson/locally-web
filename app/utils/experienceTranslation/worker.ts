@@ -97,7 +97,6 @@ export type ExperienceTranslationWorkerRepository = {
   getProviderModel(provider: ExperienceTranslationProviderName): Promise<string>;
   markTaskProcessing(task: ExperienceTranslationLeasedTask): Promise<void>;
   markTaskCancelled(task: ExperienceTranslationLeasedTask, reason: string): Promise<void>;
-  markTaskCompleted(task: ExperienceTranslationLeasedTask): Promise<void>;
   markTaskRetryable(
     task: ExperienceTranslationLeasedTask,
     provider: ExperienceTranslationProviderName,
@@ -109,7 +108,7 @@ export type ExperienceTranslationWorkerRepository = {
     experience: ExperienceTranslationRow | null,
     lastError: string
   ): Promise<void>;
-  applyExperienceTranslation(
+  finalizeExperienceTranslation(
     task: ExperienceTranslationLeasedTask,
     payload: Record<string, unknown>
   ): Promise<boolean>;
@@ -291,11 +290,10 @@ async function processTask(
       payload[getLocalizedColumnName('title', task.target_locale)] = translation.title;
       payload[getLocalizedColumnName('description', task.target_locale)] = translation.description;
     }
-    if (!await repository.applyExperienceTranslation(task, payload)) {
+    if (!await repository.finalizeExperienceTranslation(task, payload)) {
       await repository.markTaskCancelled(task, 'Stale translation task');
       return 'cancelled' as const;
     }
-    await repository.markTaskCompleted(task);
     await repository.recordProviderOutcome(
       task.provider,
       translation.totalTokens,
@@ -466,14 +464,6 @@ function createSupabaseRepository(
       ensureNoError(error, 'task_state', 'task_cancel_update_failed');
       await syncJobStatus(task.job_id);
     },
-    async markTaskCompleted(task) {
-      const { error } = await supabaseAdmin.from('experience_translation_tasks').update({
-        status: 'completed', completed_at: new Date().toISOString(),
-        lease_expires_at: null, last_error: null,
-      }).eq('id', task.id);
-      ensureNoError(error, 'task_state', 'task_complete_update_failed');
-      await syncJobStatus(task.job_id);
-    },
     async markTaskRetryable(task, provider, delaySeconds, lastError) {
       const notBefore = new Date(Date.now() + Math.max(delaySeconds, 0) * 1000).toISOString();
       const { error } = await supabaseAdmin.from('experience_translation_tasks').update({
@@ -498,12 +488,16 @@ function createSupabaseRepository(
       }
       await syncJobStatus(task.job_id);
     },
-    async applyExperienceTranslation(task, payload) {
-      const { data, error } = await supabaseAdmin.from('experiences').update(payload)
-        .eq('id', task.experience_id).eq('translation_version', task.translation_version)
-        .select('id').maybeSingle();
-      ensureNoError(error, 'experience_update', 'experience_translation_update_failed');
-      return Boolean(data);
+    async finalizeExperienceTranslation(task, payload) {
+      // Never fall back to split writes if the required DB contract is absent.
+      const { data, error } = await supabaseAdmin.rpc('finalize_experience_translation_task', {
+        p_task_id: task.id,
+        p_translation_version: task.translation_version,
+        p_lease_expires_at: task.lease_expires_at,
+        p_payload: payload,
+      });
+      ensureNoError(error, 'finalization', 'translation_atomic_finalization_failed');
+      return data === true;
     },
     async recordProviderOutcome(provider, tokenCount, cooldownSeconds, hitQuota, reservedTokenCount) {
       const { error } = await supabaseAdmin.rpc('record_translation_provider_outcome', {
