@@ -23,6 +23,7 @@ const compiled = await build({
 const compiledModule = { exports: {} };
 new Function('module', 'exports', 'require', compiled.outputFiles[0].text)(compiledModule, compiledModule.exports, require);
 const renderPage = compiledModule.exports.default;
+const HOST_ID = '00000000-0000-4000-8000-000000000001';
 
 function fixture({ applications, profile = null, experiences = [], applicationError = null }) {
   const calls = [];
@@ -57,21 +58,21 @@ const approved = {
 
 test('approved latest host supplies public initial HTML data and active experience filter', async () => {
   const calls = fixture({ applications: [{ ...approved, id: 'old', status: 'revision', created_at: '2026-10-01T00:00:00Z' }, approved], profile: { avatar_url: '/public-avatar.png' }, experiences: [{ id: 1, title: 'Public experience', status: 'active', is_active: true }] });
-  const element = await renderPage({ params: Promise.resolve({ id: 'host-id' }) });
+  const element = await renderPage({ params: Promise.resolve({ id: HOST_ID }) });
   assert.equal(element.props.initialProfile.full_name, 'Public Host');
   assert.equal(element.props.initialProfile.introduction, 'Public introduction');
   assert.equal(element.props.initialProfile.avatar_url, '/public-avatar.png');
   assert.equal(element.props.initialHostExperiences.length, 1);
   assert.doesNotMatch(JSON.stringify(element.props), /PRIVATE_PHONE_NEVER_RENDER/);
   assert.deepEqual(calls.find(row => row.table === 'experiences').filters, [
-    ['host_id', 'host-id'], ['status', 'active'], ['or', 'is_active.is.true,is_active.is.null'],
+    ['host_id', HOST_ID], ['status', 'active'], ['or', 'is_active.is.true,is_active.is.null'],
   ]);
   assert.doesNotMatch(calls.find(row => row.table === 'public_host_applications').select, /phone|email|bank|id_card/);
 });
 
 test('latest non-public application yields no server-rendered profile or experience lookup', async () => {
   const calls = fixture({ applications: [approved, { ...approved, id: 'new', status: 'revision', created_at: '2026-10-11T00:00:00Z' }] });
-  const element = await renderPage({ params: Promise.resolve({ id: 'host-id' }) });
+  const element = await renderPage({ params: Promise.resolve({ id: HOST_ID }) });
   assert.equal(element.props.initialProfile, null);
   assert.deepEqual(element.props.initialHostExperiences, []);
   assert.equal(calls.length, 1);
@@ -79,5 +80,12 @@ test('latest non-public application yields no server-rendered profile or experie
 
 test('host eligibility query failure does not silently render an empty public page', async () => {
   fixture({ applications: [], applicationError: new Error('query failed') });
-  await assert.rejects(renderPage({ params: Promise.resolve({ id: 'host-id' }) }), /query failed/);
+  await assert.rejects(renderPage({ params: Promise.resolve({ id: HOST_ID }) }), /query failed/);
+});
+
+test('malformed host IDs do not make a privileged database query', async () => {
+  const calls = fixture({ applications: [] });
+  const element = await renderPage({ params: Promise.resolve({ id: 'not-a-uuid' }) });
+  assert.equal(element.props.initialProfile, null);
+  assert.equal(calls.length, 0);
 });

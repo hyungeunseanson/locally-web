@@ -11,9 +11,13 @@ const publicExperienceSelect = [
   'status',
   'is_active',
 ].join(', ');
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!UUID_PATTERN.test(id)) {
+    return <PublicUserProfileClient params={params} initialProfile={null} initialHostExperiences={[]} />;
+  }
   const supabase = createAdminClient();
   const { data: hostApplications, error: hostError } = await supabase
     .from('public_host_applications')
