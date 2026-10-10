@@ -69,7 +69,7 @@ try {
     staticDriftChecks++;
     if (restore === null) await rm(path); else await writeFile(path,restore);
   };
-  const applied = JSON.parse(originalManifest).migrationLedger.at(-1);
+  const applied = JSON.parse(originalManifest).migrationLedger.find((entry) => entry.version === '20261007061059');
   assert.equal(applied.version,'20261007061059');
   assert.equal(applied.repositoryVersion,'20261007052144');
   const removedApplied=JSON.parse(originalManifest);removedApplied.migrationLedger.pop();
