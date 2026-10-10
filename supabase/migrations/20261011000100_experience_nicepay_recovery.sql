@@ -108,6 +108,44 @@ BEGIN
 END;
 $function$;
 
+-- A card claim and its durable recovery record must commit or roll back together.
+-- In particular, a failed event trigger/ledger insert cannot leave a processing booking.
+CREATE FUNCTION public.claim_experience_nicepay_with_recovery_atomic(
+  p_booking_id text, p_user_id uuid, p_order_id text, p_mid text
+) RETURNS TABLE (
+  outcome text, provider text, provider_reference text,
+  claim_expires_at timestamptz, claim_token uuid
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $function$
+DECLARE v_claim record; v_booking public.bookings%ROWTYPE; v_attempt_state text;
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'NICEPAY_RECOVERY_FORBIDDEN' USING ERRCODE = '42501';
+  END IF;
+  IF nullif(btrim(coalesce(p_mid, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'NICEPAY_RECOVERY_MID_MISSING' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO v_claim FROM public.claim_experience_payment_atomic(
+    p_booking_id, p_user_id, 'nicepay', p_order_id
+  );
+  IF v_claim.outcome IN ('claimed', 'already_claimed') THEN
+    SELECT * INTO v_booking FROM public.bookings WHERE id = p_booking_id FOR UPDATE;
+    IF v_booking.order_id IS DISTINCT FROM p_order_id
+       OR v_booking.user_id IS DISTINCT FROM p_user_id THEN
+      RAISE EXCEPTION 'NICEPAY_RECOVERY_BOOKING_CONFLICT' USING ERRCODE = 'P0001';
+    END IF;
+    v_attempt_state := public.prepare_experience_nicepay_attempt_atomic(
+      p_booking_id, p_order_id, p_mid, v_booking.amount
+    );
+    IF v_attempt_state <> 'claimed' THEN
+      RAISE EXCEPTION 'NICEPAY_RECOVERY_ATTEMPT_ACTIVE' USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+  RETURN QUERY SELECT v_claim.outcome::text, v_claim.provider::text,
+    v_claim.provider_reference::text, v_claim.claim_expires_at::timestamptz,
+    v_claim.claim_token::uuid;
+END;
+$function$;
+
 CREATE FUNCTION public.observe_experience_nicepay_auth_atomic(
   p_booking_id text, p_order_id text, p_tid text, p_mid text, p_amount integer
 ) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $function$
@@ -345,7 +383,34 @@ BEGIN
 END;
 $function$;
 
+-- Filter before LIMIT, so old alerted/manual or not-yet-due attempts never hide a new incident.
+CREATE FUNCTION public.list_due_experience_nicepay_recovery(
+  p_now timestamptz, p_limit integer DEFAULT 20
+) RETURNS TABLE (booking_id text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $function$
+BEGIN
+  IF coalesce(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'NICEPAY_RECOVERY_FORBIDDEN' USING ERRCODE = '42501';
+  END IF;
+  IF p_now IS NULL THEN RAISE EXCEPTION 'NICEPAY_RECOVERY_TIME_MISSING' USING ERRCODE = '22023'; END IF;
+  RETURN QUERY
+  SELECT r.booking_id FROM public.experience_nicepay_recovery r
+  WHERE (r.state = 'manual_review' AND r.alerted_at IS NULL)
+     OR (r.state IN ('claimed', 'auth_received', 'approval_started', 'approved')
+         AND ((r.next_retry_at IS NOT NULL AND r.next_retry_at <= p_now)
+           OR (r.next_retry_at IS NULL AND (
+             r.interrupted_at IS NOT NULL
+             OR (CASE WHEN r.state = 'auth_received'
+               THEN coalesce(r.auth_received_at, r.created_at) ELSE r.created_at END)
+                <= p_now - interval '5 minutes'))))
+  ORDER BY CASE WHEN r.state = 'manual_review' THEN 1 ELSE 0 END,
+    coalesce(r.next_retry_at, r.auth_received_at, r.created_at), r.booking_id
+  LIMIT least(greatest(coalesce(p_limit, 20), 1), 20);
+END;
+$function$;
+
 REVOKE ALL ON FUNCTION public.prepare_experience_nicepay_attempt_atomic(text,text,text,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.claim_experience_nicepay_with_recovery_atomic(text,uuid,text,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.observe_experience_nicepay_auth_atomic(text,text,text,text,integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.begin_experience_nicepay_approval_atomic(text,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.record_experience_nicepay_approval_atomic(text,text,text,text,integer) FROM PUBLIC, anon, authenticated;
@@ -353,7 +418,9 @@ REVOKE ALL ON FUNCTION public.confirm_experience_nicepay_recovery_atomic(text,te
 REVOKE ALL ON FUNCTION public.release_experience_nicepay_hold_atomic(text,uuid,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.note_experience_nicepay_recovery_atomic(text,text,boolean) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.interrupt_experience_nicepay_attempt_atomic(text,uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.list_due_experience_nicepay_recovery(timestamptz,integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.prepare_experience_nicepay_attempt_atomic(text,text,text,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.claim_experience_nicepay_with_recovery_atomic(text,uuid,text,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.observe_experience_nicepay_auth_atomic(text,text,text,text,integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.begin_experience_nicepay_approval_atomic(text,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_experience_nicepay_approval_atomic(text,text,text,text,integer) TO service_role;
@@ -361,3 +428,4 @@ GRANT EXECUTE ON FUNCTION public.confirm_experience_nicepay_recovery_atomic(text
 GRANT EXECUTE ON FUNCTION public.release_experience_nicepay_hold_atomic(text,uuid,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.note_experience_nicepay_recovery_atomic(text,text,boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.interrupt_experience_nicepay_attempt_atomic(text,uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.list_due_experience_nicepay_recovery(timestamptz,integer) TO service_role;

@@ -48,6 +48,10 @@ async function record(id, tid, amount = 110000) {
 async function release(id, state) {
   return rpc('release_experience_nicepay_hold_atomic', [id, user, state]);
 }
+async function claim(id) {
+  return asRole('service_role', `SELECT outcome FROM public.claim_experience_nicepay_with_recovery_atomic(
+    $1,$2,$1,'testmid00m')`, [id, user]);
+}
 async function check(label, fn) {
   await fn(); cases.push(label); console.log(`PASS ${label}`);
 }
@@ -59,6 +63,53 @@ try {
   await db.exec(baseSchema);
   await db.exec(await readFile('supabase/migrations/20260922081710_experience_payment_claim_and_pending_cleanup.sql', 'utf8'));
   await db.exec(await readFile('supabase/migrations/20261011000100_experience_nicepay_recovery.sql', 'utf8'));
+
+  await check('claim and recovery ledger roll back together on partial DB failure', async () => {
+    const id = 'ORD-PHASE2-ATOMIC-FAIL'; await booking(id, null);
+    await db.exec(`CREATE FUNCTION public.reject_recovery_fixture() RETURNS trigger
+      LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic ledger outage'; END $$;
+      CREATE TRIGGER reject_recovery_fixture BEFORE INSERT ON public.experience_nicepay_recovery
+      FOR EACH ROW EXECUTE FUNCTION public.reject_recovery_fixture()`);
+    await assert.rejects(claim(id), /synthetic ledger outage/);
+    const { rows: [unchanged] } = await db.query('SELECT payment_claim_state FROM public.bookings WHERE id=$1', [id]);
+    assert.equal(unchanged.payment_claim_state, null);
+    await db.exec('DROP TRIGGER reject_recovery_fixture ON public.experience_nicepay_recovery');
+    assert.equal((await claim(id)).rows[0].outcome, 'claimed');
+    assert.equal((await claim(id)).rows[0].outcome, 'already_claimed');
+    const { rows: [proof] } = await db.query(`SELECT b.payment_claim_state, r.state,
+      (SELECT count(*)::int FROM public.experience_nicepay_recovery_events e WHERE e.booking_id=b.id) AS events
+      FROM public.bookings b JOIN public.experience_nicepay_recovery r ON r.booking_id=b.id WHERE b.id=$1`, [id]);
+    assert.deepEqual([proof.payment_claim_state, proof.state, proof.events], ['processing', 'claimed', 1]);
+    await db.close(); db = new PGlite(dir);
+    assert.equal((await claim(id)).rows[0].outcome, 'already_claimed');
+    await db.query(`UPDATE public.bookings SET created_at=now()-interval '31 minutes',
+      payment_claim_expires_at=now()-interval '1 minute' WHERE id=$1`, [id]);
+    await db.query(`UPDATE public.experience_nicepay_recovery SET interrupted_at=now()
+      WHERE booking_id=$1`, [id]);
+    const [cleanup, due] = await Promise.all([
+      asRole('service_role', 'SELECT * FROM public.cancel_expired_pending_bookings_atomic(100)'),
+      asRole('service_role', 'SELECT * FROM public.list_due_experience_nicepay_recovery(now(), 20)'),
+    ]);
+    assert.ok(cleanup.rows[0].reconciliation_required_count >= 1);
+    assert.ok(due.rows.some(row => row.booking_id === id));
+    const { rows: [after] } = await db.query('SELECT payment_claim_state, status FROM public.bookings WHERE id=$1', [id]);
+    assert.deepEqual([after.payment_claim_state, after.status], ['reconciliation_required', 'PENDING']);
+    assert.equal(await release(id, 'no_auth'), 'released');
+  });
+
+  await check('due query filters before limit with 160 older irrelevant records', async () => {
+    for (let i = 0; i < 160; i++) {
+      const id = `ORD-PHASE2-STALE-${i}`; await booking(id); await prepare(id);
+      await db.query(`UPDATE public.experience_nicepay_recovery SET state='manual_review',
+        alerted_at=now(), created_at=now()-interval '2 days' WHERE booking_id=$1`, [id]);
+    }
+    const id = 'ORD-PHASE2-NEW-DUE'; await booking(id); await prepare(id);
+    await db.query(`UPDATE public.experience_nicepay_recovery
+      SET interrupted_at=now(), next_retry_at=now() WHERE booking_id=$1`, [id]);
+    const { rows } = await asRole('service_role',
+      'SELECT * FROM public.list_due_experience_nicepay_recovery(now(), 20)');
+    assert.ok(rows.some(row => row.booking_id === id));
+  });
 
   await check('approval success and DB success, settlement preserved', async () => {
     const id = 'ORD-PHASE2-SUCCESS'; const tid = 'TID-PHASE2-SUCCESS';
@@ -169,6 +220,10 @@ try {
   await check('authenticated role cannot write recovery ledger', async () => {
     await assert.rejects(asRole('authenticated', "SELECT public.note_experience_nicepay_recovery_atomic('ORD-PHASE2-LATE','bad',true)"));
     await assert.rejects(asRole('authenticated', 'SELECT * FROM public.experience_nicepay_recovery'));
+    await assert.rejects(asRole('authenticated', `SELECT * FROM public.claim_experience_nicepay_with_recovery_atomic(
+      'ORD-PHASE2-LATE',$1,'ORD-PHASE2-LATE','testmid00m')`, [user]));
+    await assert.rejects(asRole('authenticated',
+      'SELECT * FROM public.list_due_experience_nicepay_recovery(now(),20)'));
   });
 
   console.log(`PASS ${cases.length} local PGlite Phase 2 cases`);

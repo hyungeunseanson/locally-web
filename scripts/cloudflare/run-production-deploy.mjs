@@ -117,7 +117,9 @@ export function parseDeploymentArguments(argumentsList) {
   };
 }
 
-export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false, nicepayRecoveryEnabled = false } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }, opsAnomalyMonitorProfile = { scheduledEnabled: 'false' }) {
+// The rollout uses --enable-nicepay-recovery to permit the false -> true change.
+// Later deploys keep true by default but cannot silently change the remote value.
+export function buildDeploymentContract(profile, translationProfile, homePopularityProfile, adminSupportUnreadProfile, notificationRetentionProfile, { dryRun = false, nicepayRecoveryEnabled = true } = {}, experienceCompletionProfile = { scheduledEnabled: 'false' }, experienceMediaSourceProfile = { enabled: 'false' }, serviceCompletionProfile = { scheduledEnabled: 'false' }, cancelPendingBookingsProfile = { scheduledEnabled: 'false' }, opsAnomalyMonitorProfile = { scheduledEnabled: 'false' }) {
   const readerEnvironment = {
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_ENABLED: profile.enabled,
     NEXT_PUBLIC_PUBLIC_EXPERIENCE_MEDIA_READER_EXPERIENCE_IDS: profile.experienceIds,

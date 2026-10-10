@@ -196,17 +196,11 @@ export async function recoverNicePayAttempt(params: {
 }
 
 export async function runNicePayRecoveryBatch(params: { client: SupabaseClient; now?: number }) {
-  const { data, error } = await params.client.from('experience_nicepay_recovery')
-    .select('booking_id, state, next_retry_at, created_at, interrupted_at, alerted_at')
-    .in('state', ['claimed', 'auth_received', 'approval_started', 'approved', 'manual_review'])
-    .order('created_at', { ascending: true }).limit(100);
-  if (error) throw error;
   const now = params.now ?? Date.now();
-  const due = (data || []).filter((row) => {
-    if (row.state === 'manual_review') return !row.alerted_at;
-    if (row.next_retry_at) return Date.parse(row.next_retry_at) <= now;
-    return Boolean(row.interrupted_at) || Date.parse(row.created_at) <= now - ABANDONED_AFTER_MS;
-  }).slice(0, 20);
+  const { data: due, error } = await params.client.rpc('list_due_experience_nicepay_recovery', {
+    p_now: new Date(now).toISOString(), p_limit: 20,
+  });
+  if (error || !Array.isArray(due)) throw new Error(`NICEPAY recovery due query failed: ${error?.message || 'empty result'}`);
   const results: PromiseSettledResult<RecoveryResult>[] = [];
   for (const row of due) {
     try {

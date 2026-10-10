@@ -66,6 +66,19 @@ try {
     from: table => new Query(table),
     async rpc(name, args) {
       rpcCalls.push({ name, args });
+      if (name === 'list_due_experience_nicepay_recovery') {
+        const now = Date.parse(args.p_now);
+        const due = [...rows.values()].filter(item =>
+          item.state === 'manual_review' ? !item.alerted_at :
+          ['claimed', 'auth_received', 'approval_started', 'approved'].includes(item.state) &&
+          (item.next_retry_at ? Date.parse(item.next_retry_at) <= now :
+            Boolean(item.interrupted_at) ||
+            Date.parse(item.state === 'auth_received' ? item.auth_received_at || item.created_at : item.created_at) <= now - 5 * 60_000));
+        due.sort((a, b) => Number(a.state === 'manual_review') - Number(b.state === 'manual_review') ||
+          Date.parse(a.next_retry_at || a.auth_received_at || a.created_at) -
+          Date.parse(b.next_retry_at || b.auth_received_at || b.created_at));
+        return { data: due.slice(0, args.p_limit).map(item => ({ booking_id: item.booking_id })), error: null };
+      }
       const item = rows.get(args.p_booking_id);
       if (name === 'release_experience_nicepay_hold_atomic') {
         if (item.state === 'released') return { data: 'already_released', error: null };
@@ -125,6 +138,22 @@ try {
   const batch = await runtime.runNicePayRecoveryBatch({ client, now: clock });
   assert.ok(batch.confirmed >= 1);
   console.log('PASS server-side scheduled replay confirms persisted approval intent');
+
+  for (let i = 0; i < 160; i++) add(`ORD-OLD-ALERT-${i}`, {
+    state: 'manual_review', alerted_at: new Date(clock - 60_000).toISOString(),
+    created_at: new Date(clock - 24 * 60 * 60_000).toISOString(),
+  });
+  for (let i = 0; i < 10; i++) add(`ORD-OLD-NOT-DUE-${i}`, {
+    state: 'approval_started', tid: `TID-NOT-DUE-${i}`,
+    next_retry_at: new Date(clock + 60_000).toISOString(),
+    created_at: new Date(clock - 24 * 60 * 60_000).toISOString(),
+  });
+  add('ORD-NEW-INCIDENT', { state: 'approved', tid: 'TID-NEW-INCIDENT',
+    next_retry_at: new Date(clock - 1000).toISOString() });
+  assert.ok((await runtime.runNicePayRecoveryBatch({ client, now: clock })).confirmed >= 1);
+  assert.equal(bookings.get('ORD-NEW-INCIDENT').status, 'PENDING');
+  assert.ok(state.finalizeCalls.some(x => x.originalBooking.id === 'ORD-NEW-INCIDENT'));
+  console.log('PASS 170 stale/not-due rows cannot starve a new approved incident');
 
   add('ORD-CANCELLED', { state: 'approval_started', tid: 'TID-CANCELLED' });
   state.provider = 'cancelled';

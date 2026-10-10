@@ -844,7 +844,9 @@ test('completes successfully when browser smoke passes', async () => {
 
 test('NICEPAY recovery requires an explicit release flag after the database migration', async () => {
   const defaultContract = await resolveProductionDeploymentContract(parseDeploymentArguments(['--dry-run']));
-  assert.equal(defaultContract.runtimeVariables.NICEPAY_RECOVERY_SCHEDULED_ENABLED, 'false');
+  assert.equal(defaultContract.runtimeVariables.NICEPAY_RECOVERY_SCHEDULED_ENABLED, 'true');
+  assert.ok(defaultContract.wranglerArguments.includes('NICEPAY_RECOVERY_SCHEDULED_ENABLED:true'));
+  assert.equal(parseDeploymentArguments([]).nicepayRecoveryEnabled, undefined);
   const options = parseDeploymentArguments(['--dry-run', '--enable-nicepay-recovery']);
   const enabled = await resolveProductionDeploymentContract(options);
   assert.equal(enabled.runtimeVariables.NICEPAY_RECOVERY_SCHEDULED_ENABLED, 'true');

@@ -1340,7 +1340,7 @@
       "version": "20261011000100",
       "name": "experience_nicepay_recovery",
       "repositoryFile": "supabase/migrations/20261011000100_experience_nicepay_recovery.sql",
-      "repositorySha256": "e6a2dfa8a4204ac09097219f0992f8560d8cf3d2ec07694cb2e01959c0323c25",
+      "repositorySha256": "c48d009c964368e1ab0b6d25cc795b2cce711a01edb1244a305fc65e7f7f5965",
       "status": "approval_required",
       "automaticProductionApply": false
     }
