@@ -1,372 +1,61 @@
-'use client';
-
-import React, { use, useEffect, useMemo, useState } from 'react';
-import { createClient } from '@/app/utils/supabase/client';
-import SiteHeader from '@/app/components/SiteHeader';
-import { User, CheckCircle2, Star } from 'lucide-react';
-import ExperienceCard from '@/app/components/ExperienceCard';
-import PublicReviewSection from '@/app/components/reviews/PublicReviewSection';
-import SuperhostBadgeTrigger from '@/app/components/SuperhostBadgeTrigger';
-import { useLanguage } from '@/app/context/LanguageContext';
+import PublicUserProfileClient, { type PublicHostProfile } from './PublicUserProfileClient';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 import {
   isPublicHostApplicationStatus,
   pickLatestPublicHostApplication,
 } from '@/app/utils/hostVisibility';
-import { formatAgeBand, formatDemographicGender } from '@/app/utils/demographics';
-import { fetchPublicDemographics } from '@/app/utils/publicDemographicsClient';
-import PublicHostProfileImage from '@/app/components/PublicHostProfileImage';
+import { createAdminClient } from '@/app/utils/supabase/admin';
 
-type PublicHostProfile = {
-  full_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  introduction: string | null;
-  languages: string[];
-  is_superhost: boolean;
-  age_band: string | null;
-  gender: 'Male' | 'Female' | 'Other' | null;
-};
-
-type HostExperienceCardData = {
-  id: number | string;
-  title?: string | null;
-  title_ko?: string | null;
-  title_en?: string | null;
-  title_ja?: string | null;
-  title_zh?: string | null;
-  category?: string | null;
-  category_en?: string | null;
-  category_ja?: string | null;
-  category_zh?: string | null;
-  city?: string | null;
-  subCity?: string | null;
-  country?: string | null;
-  location?: string | null;
-  languages?: string[] | null;
-  image_url?: string | null;
-  photos?: string[] | null;
-  rating?: number | null;
-  review_count?: number | null;
-  price?: number | string | null;
-  duration?: number | string | null;
-  status?: string | null;
-  is_active?: boolean | null;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function readNullableString(value: unknown): string | null | undefined {
-  if (value == null) return null;
-  return typeof value === 'string' ? value : undefined;
-}
-
-function readNullableStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-
-  return value.filter((entry): entry is string => typeof entry === 'string');
-}
-
-function readNullableNumber(value: unknown): number | null | undefined {
-  if (value == null) return null;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function readNullableNumberOrString(value: unknown): number | string | null | undefined {
-  if (value == null) return null;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') return value;
-  return undefined;
-}
-
-function readNullableBoolean(value: unknown): boolean | null | undefined {
-  if (value == null) return null;
-  if (typeof value === 'boolean') return value;
-  return undefined;
-}
-
-function normalizeHostExperienceRows(rows: unknown): HostExperienceCardData[] {
-  if (!Array.isArray(rows)) {
-    return [];
-  }
-
-  return rows.reduce<HostExperienceCardData[]>((acc, row) => {
-    if (!isRecord(row)) {
-      return acc;
-    }
-
-    const id = row.id;
-    if (typeof id !== 'string' && typeof id !== 'number') {
-      return acc;
-    }
-
-    acc.push({
-      id,
-      title: readNullableString(row.title),
-      title_ko: readNullableString(row.title_ko),
-      title_en: readNullableString(row.title_en),
-      title_ja: readNullableString(row.title_ja),
-      title_zh: readNullableString(row.title_zh),
-      category: readNullableString(row.category),
-      category_en: readNullableString(row.category_en),
-      category_ja: readNullableString(row.category_ja),
-      category_zh: readNullableString(row.category_zh),
-      city: readNullableString(row.city),
-      subCity: readNullableString(row.subCity),
-      country: readNullableString(row.country),
-      location: readNullableString(row.location),
-      languages: readNullableStringArray(row.languages),
-      image_url: readNullableString(row.image_url),
-      photos: readNullableStringArray(row.photos),
-      rating: readNullableNumber(row.rating),
-      review_count: readNullableNumber(row.review_count),
-      price: readNullableNumberOrString(row.price),
-      duration: readNullableNumberOrString(row.duration),
-      status: readNullableString(row.status),
-      is_active: readNullableBoolean(row.is_active),
-    });
-
-    return acc;
-  }, []).filter((row) => row.is_active !== false);
-}
-
-const PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT = [
+const publicExperienceSelect = [
   ...PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS,
   'status',
   'is_active',
 ].join(', ');
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const { lang, t } = useLanguage();
-  const [profile, setProfile] = useState<PublicHostProfile | null>(null);
-  const [hostExperiences, setHostExperiences] = useState<HostExperienceCardData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
+export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!UUID_PATTERN.test(id)) {
+    return <PublicUserProfileClient params={params} initialProfile={null} initialHostExperiences={[]} />;
+  }
+  const supabase = createAdminClient();
+  const { data: hostApplications, error: hostError } = await supabase
+    .from('public_host_applications')
+    .select('id, status, name, profile_photo, self_intro, languages, is_superhost, created_at')
+    .eq('user_id', id)
+    .order('created_at', { ascending: false });
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      // 공개 호스트 프로필은 safe projection view만 사용한다.
-      const [{ data: hostApp }, { data: publicAccountProfile }, publicDemographics] = await Promise.all([
-        supabase
-          .from('public_host_applications')
-          .select('id, status, name, profile_photo, self_intro, languages, is_superhost, created_at')
-          .eq('user_id', resolvedParams.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('public_profiles')
-          .select('avatar_url')
-          .eq('id', resolvedParams.id)
-          .maybeSingle(),
-        fetchPublicDemographics(resolvedParams.id),
-      ]);
+  if (hostError) throw hostError;
 
-      const latestHostApp = pickLatestPublicHostApplication(hostApp || []);
+  const latestHost = pickLatestPublicHostApplication(hostApplications || []);
+  if (!latestHost?.name || !isPublicHostApplicationStatus(latestHost.status)) {
+    return <PublicUserProfileClient params={params} initialProfile={null} initialHostExperiences={[]} />;
+  }
 
-      const isPublicHost = isPublicHostApplicationStatus(latestHostApp?.status);
+  // Use the same public projections and active-experience filters as the client page.
+  const [{ data: publicAccountProfile, error: profileError }, { data: experiences, error: experienceError }] = await Promise.all([
+    supabase.from('public_profiles').select('avatar_url').eq('id', id).maybeSingle(),
+    supabase.from('experiences')
+      .select(publicExperienceSelect)
+      .eq('host_id', id)
+      .eq('status', 'active')
+      .or('is_active.is.true,is_active.is.null'),
+  ]);
+  if (profileError) throw profileError;
+  if (experienceError) throw experienceError;
 
-      setProfile(isPublicHost && latestHostApp ? {
-        full_name: latestHostApp.name,
-        avatar_url: latestHostApp.profile_photo || publicAccountProfile?.avatar_url || null,
-        bio: latestHostApp.self_intro,
-        introduction: latestHostApp.self_intro,
-        languages: Array.isArray(latestHostApp.languages)
-          ? latestHostApp.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-          : [],
-        is_superhost: Boolean(latestHostApp.is_superhost),
-        age_band: publicDemographics?.age_band || null,
-        gender: publicDemographics?.gender || null,
-      } : null);
+  const profile: PublicHostProfile = {
+    full_name: latestHost.name,
+    avatar_url: latestHost.profile_photo || publicAccountProfile?.avatar_url || null,
+    bio: latestHost.self_intro,
+    introduction: latestHost.self_intro,
+    languages: Array.isArray(latestHost.languages)
+      ? latestHost.languages.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      : [],
+    is_superhost: Boolean(latestHost.is_superhost),
+    age_band: null,
+    gender: null,
+  };
 
-      // 공개 상태 호스트의 경우에만 운영 중인 활성 체험 가져오기
-      if (isPublicHost) {
-        const { data: expData, error: expError } = await supabase
-          .from('experiences')
-          .select(PUBLIC_HOST_PROFILE_EXPERIENCE_SELECT)
-          .eq('host_id', resolvedParams.id)
-          .eq('status', 'active')
-          .or('is_active.is.true,is_active.is.null');
-
-        if (expError) {
-          console.error('[Public host profile] experience lookup failed:', expError);
-        }
-
-        setHostExperiences(normalizeHostExperienceRows(expData));
-      } else {
-        setHostExperiences([]);
-      }
-      setLoading(false);
-    };
-
-    fetchProfile();
-  }, [resolvedParams.id, supabase]);
-
-  if (loading) return <div className="min-h-screen bg-white" />;
-
-  const displayName = profile?.full_name || t('public_host_profile_name_fallback');
-  const activeExperienceCountLabel = t('public_host_profile_meta_active_count').replace('{count}', String(hostExperiences.length));
-  const ageBandLabel = formatAgeBand(profile?.age_band, lang);
-  const genderLabel = formatDemographicGender(profile?.gender, lang);
-  const demographicsLabel = [ageBandLabel, genderLabel].filter(Boolean).join(' · ');
-
-  return (
-    <div className="min-h-screen bg-white font-sans text-slate-900">
-      <SiteHeader />
-
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-12">
-        <div className="flex flex-col md:flex-row gap-6 md:gap-12">
-
-          {/* 왼쪽: 프로필 카드 (고정) */}
-          <div className="md:w-1/3">
-            <div className="border border-slate-200 rounded-2xl md:rounded-3xl p-5 md:p-8 shadow-lg sticky top-24">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-slate-100 mb-4 md:mb-6">
-                  {profile?.avatar_url ? (
-                    <div className="relative w-full h-full">
-                      <PublicHostProfileImage
-                        hostId={resolvedParams.id}
-                        originImageUrl={profile.avatar_url}
-                        alt={profile?.full_name || 'Host profile'}
-                        loading="eager"
-                        sizes="(max-width: 768px) 96px, 128px"
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-300"><User size={64} /></div>
-                  )}
-                </div>
-                <div className="mb-2 flex items-center justify-center gap-1.5">
-                  <h1 className="text-2xl md:text-3xl font-black">{displayName}</h1>
-                  {profile?.is_superhost ? (
-                    <SuperhostBadgeTrigger
-                      iconSize={20}
-                      showLabel={false}
-                      testIdPrefix="public-host-superhost-badge"
-                    />
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
-                  <div className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm font-bold text-slate-700">
-                    <CheckCircle2 size={16} className="text-black" /> {t('verified_identity')}
-                  </div>
-                  <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
-                    {activeExperienceCountLabel}
-                  </div>
-                  {demographicsLabel && (
-                    <div
-                      data-testid="public-host-demographics"
-                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600"
-                    >
-                      {demographicsLabel}
-                    </div>
-                  )}
-                </div>
-
-                {profile?.languages && profile.languages.length > 0 && (
-                  <div data-testid="public-host-languages" className="mb-6 w-full text-left">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                      {t('field_label_languages')}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.languages.map((language) => (
-                        <span
-                          key={language}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600"
-                        >
-                          {language}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <p className="mb-3 text-sm leading-relaxed text-slate-500">
-                  {t('public_host_profile_verification_desc')}
-                </p>
-
-                <div className="w-full border-t border-slate-100 py-4 md:py-6 text-left space-y-3 md:space-y-4">
-                  <h3 className="font-bold text-base md:text-lg">
-                    {t('public_host_profile_verification_title').replace('{name}', displayName)}
-                  </h3>
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_id')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_email')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <CheckCircle2 size={18} /> <span>{t('public_host_profile_verification_phone')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 오른쪽: 상세 소개 및 체험 목록 */}
-          <div className="md:w-2/3 space-y-12">
-
-            {/* 소개글 */}
-            <section>
-              <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3">{t('public_host_profile_intro_title')}</h2>
-              <p className="mb-4 text-sm leading-relaxed text-slate-500 md:mb-6">
-                {t('public_host_profile_intro_desc')}
-              </p>
-              <div className="prose prose-slate max-w-none">
-                <p className="text-base md:text-lg leading-relaxed text-slate-700">
-                  {profile?.introduction || profile?.bio || t('public_host_profile_intro_empty')}
-                </p>
-              </div>
-            </section>
-
-            {/* 운영 중인 체험 */}
-            <section data-testid="public-host-experiences-section" className="pt-12 border-t border-slate-100">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold mb-2">
-                    {t('public_host_profile_experiences_title').replace('{name}', displayName)}
-                  </h2>
-                  <p className="text-sm leading-relaxed text-slate-500">
-                    {t('public_host_profile_experiences_desc')}
-                  </p>
-                </div>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">
-                  {activeExperienceCountLabel}
-                </span>
-              </div>
-
-              {hostExperiences.length > 0 ? (
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {hostExperiences.map((exp, index) => (
-                    <ExperienceCard key={exp.id} data={exp} eager={index === 0} />
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-                  {t('public_host_profile_experiences_empty')}
-                </div>
-              )}
-            </section>
-
-            {/* 후기 */}
-            <section data-testid="public-host-reviews-section" className="pt-12 border-t border-slate-100">
-              <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3 flex items-center gap-2">
-                <Star className="fill-black" size={24} /> {t('public_host_profile_reviews_title')}
-              </h2>
-              <p className="mb-4 text-sm leading-relaxed text-slate-500 md:mb-6">
-                {t('public_host_profile_reviews_desc')}
-              </p>
-              <PublicReviewSection hostId={resolvedParams.id} hostName={displayName} />
-            </section>
-
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+  return <PublicUserProfileClient params={params} initialProfile={profile} initialHostExperiences={experiences || []} />;
 }

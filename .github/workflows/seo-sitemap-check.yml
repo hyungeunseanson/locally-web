@@ -32,10 +32,12 @@ jobs:
         run: npm run test:seo:sitemap
       - name: Community legacy/modern policy, privacy and Next HTTP regressions
         run: npm run test:seo:community
+      - name: Public Host SSR and visibility regressions
+        run: node --test tests/integration/public-host-ssr.test.mjs
       - name: Preserve Community UUID guard and existing public detail behavior
         run: npx playwright test -c playwright.contracts.config.ts tests/e2e/community-invalid-uuid-guard.spec.mjs --project=chromium --workers=1 --reporter=line
-      - name: Lint sitemap and Community changes
-        run: npx eslint app/robots.ts tests/unit/robots-policy.test.mjs app/sitemap.ts app/utils/sitemapData.ts app/community/indexability.ts app/community/detailData.server.ts app/community/\[id\]/page.tsx tests/integration/sitemap-recovery.test.mjs tests/integration/community-indexability.test.mjs tests/e2e/community-invalid-uuid-guard.spec.mjs
+      - name: Lint sitemap, Community and Host SSR changes
+        run: npx eslint app/robots.ts tests/unit/robots-policy.test.mjs app/sitemap.ts app/utils/sitemapData.ts app/community/indexability.ts app/community/detailData.server.ts app/community/\[id\]/page.tsx app/users/\[id\]/page.tsx app/users/\[id\]/PublicUserProfileClient.tsx tests/integration/sitemap-recovery.test.mjs tests/integration/community-indexability.test.mjs tests/integration/public-host-ssr.test.mjs tests/e2e/community-invalid-uuid-guard.spec.mjs
       - name: Build OpenNext without provider access
         run: npm run cloudflare:build:production
       - name: Verify the real sitemap in local workerd with synthetic SQL and R2 only
