@@ -1,7 +1,10 @@
 import './helpers/serverOnlyTestShim';
 import { expect, test } from '@playwright/test';
 import { classifyExperienceText, inspectExperienceLocale } from '@/app/utils/experienceTranslation/integrity';
-import { FIXED_EXPERIENCE_POLICY_ID, getLocalizedExperienceList, getLocalizedExperienceRules, getLocalizedExperienceItinerary, getLocalizedRefundPolicyLabel } from '@/app/utils/experienceTranslation';
+import { FIXED_EXPERIENCE_POLICY_ID, buildManualContentFromExperience, getLocalizedExperienceList, getLocalizedExperienceRules, getLocalizedExperienceItinerary, getLocalizedRefundPolicyLabel } from '@/app/utils/experienceTranslation';
+import { FIXED_REFUND_POLICY } from '@/app/host/create/config';
+import { buildExperienceWritePayload, type ExperienceFormState } from '@/app/host/create/experienceFormState';
+import { getLanguageNames, normalizeLanguageLevels } from '@/app/utils/languageLevels';
 import { getContent } from '@/app/utils/contentHelper';
 import { createExperienceFromBody, updateExperienceFromBody, toApiErrorResponse, type ExperienceWriteDependencies } from '@/app/api/host/experiences/shared';
 
@@ -16,14 +19,15 @@ function body() {
     inclusions: ['현지 가이드'], exclusions: [], supplies: '', duration: 2, maxGuests: 4, price: 50000,
     rules: { age_limit: '만 20세 이상', activity_level: '보통', host_notice: '', refund_policy: 'client literal is ignored' } };
 }
-function harness(existing?: Record<string, unknown>) {
+function harness(existing?: Record<string, unknown>, conflict = false) {
   const writes: Record<string, unknown>[] = [];
+  const filters: Array<[string, unknown]> = [];
   let queries = 0, queues = 0;
   const query = {
-    select() { return this; }, eq() { return this; },
+    select() { return this; }, eq(column: string, value: unknown) { filters.push([column, value]); return this; },
     insert(value: Record<string, unknown>) { writes.push(value); return this; },
     update(value: Record<string, unknown>) { writes.push(value); return this; },
-    async maybeSingle() { return { data: writes.length ? { id: 1, status: 'pending' } : existing, error: null }; },
+    async maybeSingle() { return { data: writes.length ? (conflict ? null : { id: 1, status: 'pending' }) : existing, error: null }; },
   };
   const dependencies = {
     createAdminClient: () => ({ from() { queries++; return query; } }),
@@ -31,7 +35,25 @@ function harness(existing?: Record<string, unknown>) {
     enqueueTranslationJob: async () => { queues++; }, markTranslationQueueFailure: async () => undefined,
     insertAdminAlerts: async () => undefined, sendAdminAlertEmails: async () => undefined,
   } as unknown as ExperienceWriteDependencies;
-  return { dependencies, writes, get queries() { return queries; }, get queues() { return queues; } };
+  return { dependencies, writes, filters, get queries() { return queries; }, get queues() { return queues; } };
+}
+
+async function pendingManualBodyFixture() {
+  const value = {
+    ...body(),
+    language_levels: [{ language: 'ko', level: 5 }, { language: 'en', level: 5 }, { language: 'ja', level: 5 }],
+    manual_content: {
+      ko: body().manual_content.ko,
+      en: { title: 'Tokyo neighborhood walk', description: 'Walk through Tokyo neighborhoods with a local host and discover everyday places.' },
+      ja: { title: '東京の街歩き体験', description: '地元のホストと一緒に東京の街を歩きながら、日常の風景を楽しみましょう。' },
+    },
+  };
+  const created = harness();
+  await createExperienceFromBody(value, actor, created.dependencies);
+  const existing = { ...created.writes[0], id: 1, host_id: actor.id, status: 'pending', media_revision: 3 };
+  const edited = { ...value, manual_content: { ...value.manual_content,
+    ko: { ...value.manual_content.ko, title: '새로운 도쿄 골목 산책 체험' } } };
+  return { value, existing, edited };
 }
 
 for (const [field, value] of [
@@ -150,6 +172,171 @@ test('missing retained manual body cannot receive a fresh ready stamp; complete 
   expect(complete.queries).toBe(2);
   expect(complete.writes[0]).toMatchObject({ translation_meta: { ja: { mode: 'manual', status: 'ready' } } });
   expect(complete.writes[0]).not.toHaveProperty('itinerary_i18n');
+});
+
+test('pending admin Korean title edit preserves incomplete English and Japanese bodies without new ready states', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const h = harness(existing);
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual(['en', 'ja']);
+  expect(result.manualLocalesNeedingReview).toEqual([]);
+  expect(result.queuedLocales).toEqual(['zh']);
+  expect(h.writes).toHaveLength(1);
+  expect(h.writes[0]).toEqual({
+    title: edited.manual_content.ko.title,
+    title_ko: edited.manual_content.ko.title,
+    translation_version: 2,
+    translation_meta: {
+      ko: { mode: 'manual', status: 'ready', version: 2 },
+      en: { mode: 'manual', status: 'failed', version: 2 },
+      ja: { mode: 'manual', status: 'failed', version: 2 },
+      zh: { mode: 'ai', status: 'queued', version: 2 },
+    },
+  });
+  expect(h.filters).toContainEqual(['media_revision', 3]);
+  expect(h.filters).toContainEqual(['status', 'pending']);
+  expect(h.filters).toContainEqual(['translation_version', 1]);
+  expect(h.queues).toBe(1);
+});
+
+test('anonymized 4839-shaped edit form PATCH reaches the title-only write path', async () => {
+  const { existing } = await pendingManualBodyFixture();
+  const base = existing as Record<string, unknown>;
+  const levels = [
+    { language: '한국어', level: 4 }, { language: '영어', level: 1 }, { language: '일본어', level: 5 },
+  ];
+  const itinerary = [
+    { title: '만남 장소', description: '호스트와 만납니다.', type: 'meet', image_url: 'https://example.test/stop.jpg' },
+    { title: '첫 장소', description: '동네를 둘러봅니다.', type: 'spot', image_url: '' },
+    { title: '둘째 장소', description: '함께 산책합니다.', type: 'spot', image_url: '' },
+  ];
+  const stored = {
+    ...existing,
+    country: 'Japan', city: '오사카', category: '맛집 탐방',
+    language_levels: levels, languages: getLanguageNames(normalizeLanguageLevels(levels, [], 3)),
+    photos: ['https://example.test/one.jpg', 'https://example.test/two.jpg', 'https://example.test/three.jpg'],
+    itinerary, itinerary_i18n: { ko: itinerary, zh: itinerary },
+    meeting_point_i18n: { ko: base.meeting_point, zh: base.meeting_point },
+    rules_i18n: { ko: base.rules, zh: base.rules },
+    duration: 3, max_guests: 10, price: '50000', private_price: '120000',
+    solo_guarantee_price: 30000, is_private_enabled: true, media_revision: 3,
+  };
+  const manualContent = buildManualContentFromExperience(stored, ['ko', 'en', 'ja'], 'ko');
+  const form = {
+    ...stored,
+    subCity: '',
+    manual_content: { ...manualContent, ko: { ...manualContent.ko, title: '수정한 오사카 골목 산책 체험' } },
+    rules: { ...(base.rules as Record<string, unknown>), refund_policy: FIXED_REFUND_POLICY },
+    language_levels: normalizeLanguageLevels(stored.language_levels, stored.languages, 3),
+    itinerary: stored.itinerary.map(item => ({ ...item, image_url: item.image_url || '' })),
+  } as unknown as ExperienceFormState;
+  const patch = buildExperienceWritePayload({
+    ...form,
+    inclusions: form.inclusions.map(item => item.trim()).filter(Boolean),
+    exclusions: form.exclusions.map(item => item.trim()).filter(Boolean),
+    duration: Number(form.duration),
+    maxGuests: Number(stored.max_guests),
+    meeting_point: form.meeting_point || form.itinerary[0].title,
+  });
+  const h = harness(stored);
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: patch }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual(['en', 'ja']);
+  expect(result.manualLocalesNeedingReview).toEqual([]);
+  expect(h.writes).toHaveLength(1);
+  expect(Object.keys(h.writes[0]).sort()).toEqual(['title', 'title_ko', 'translation_meta', 'translation_version']);
+  expect(h.writes[0].translation_version).toBe(2);
+  expect(h.queues).toBe(1);
+});
+
+test('a complete retained manual translation is not certified against the new Korean title', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const complete = {
+    ...existing,
+    meeting_point_i18n: { ko: (existing as Record<string, unknown>).meeting_point, en: 'Koenji Station', ja: '高円寺駅' },
+    inclusions_i18n: { en: ['Local guide'], ja: ['現地ガイド'] },
+    itinerary_i18n: {
+      en: [{ title: 'Meet', description: 'Meet at the station.', type: 'meet', image_url: '' }],
+      ja: [{ title: '集合', description: '駅でお会いします。', type: 'meet', image_url: '' }],
+    },
+    rules_i18n: {
+      en: { age_limit: 'Ages 20 and over', activity_level: 'Moderate', refund_policy: '', refund_policy_id: FIXED_EXPERIENCE_POLICY_ID, host_notice: '' },
+      ja: { age_limit: '20歳以上', activity_level: '普通', refund_policy: '', refund_policy_id: FIXED_EXPERIENCE_POLICY_ID, host_notice: '' },
+    },
+  };
+  const h = harness(complete);
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual([]);
+  expect(result.manualLocalesNeedingReview).toEqual(['en', 'ja']);
+  expect(h.writes[0]).not.toHaveProperty('meeting_point_i18n');
+  expect(h.writes[0]).not.toHaveProperty('title_en');
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).en.status).toBe('failed');
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).ja.status).toBe('failed');
+});
+
+test('title-only save separates complete translations needing review from missing bodies', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const h = harness({
+    ...existing,
+    meeting_point_i18n: { en: 'Koenji Station' },
+    inclusions_i18n: { en: ['Local guide'] },
+    itinerary_i18n: { en: [{ title: 'Meet', description: 'Meet at the station.', type: 'meet', image_url: '' }] },
+    rules_i18n: { en: { age_limit: 'Ages 20 and over', activity_level: 'Moderate', refund_policy: '', refund_policy_id: FIXED_EXPERIENCE_POLICY_ID, host_notice: '' } },
+  });
+  const result = await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies);
+  expect(result.incompleteManualLocales).toEqual(['ja']);
+  expect(result.manualLocalesNeedingReview).toEqual(['en']);
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).en.status).toBe('failed');
+  expect((h.writes[0].translation_meta as Record<string, { status: string }>).ja.status).toBe('failed');
+});
+
+test('pending title exception does not cover price, body, locale, host, or published edits', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  for (const changed of [
+    { ...edited, price: edited.price + 1000 },
+    { ...edited, language_levels: edited.language_levels.slice(0, 2) },
+  ]) {
+    const h = harness(existing);
+    await expect(updateExperienceFromBody({ experienceId: 1, actor, body: changed }, h.dependencies))
+      .rejects.toThrow('번역 본문이 누락');
+    expect(h.writes).toHaveLength(0);
+  }
+  const changedBody = { ...edited, rules: { ...edited.rules, age_limit: '만 19세 이상' } };
+  const ordinaryPath = harness(existing);
+  const ordinaryResult = await updateExperienceFromBody({ experienceId: 1, actor, body: changedBody }, ordinaryPath.dependencies);
+  expect(ordinaryResult.incompleteManualLocales).toEqual([]);
+  expect(ordinaryResult.queuedLocales).toEqual(['en', 'ja', 'zh']);
+  expect(ordinaryPath.writes[0]).toHaveProperty('rules_i18n');
+  for (const [changedActor, changedExisting] of [
+    [{ ...actor, isAdmin: false }, existing],
+    [actor, { ...existing, status: 'active' }],
+  ] as const) {
+    const h = harness(changedExisting);
+    await expect(updateExperienceFromBody({ experienceId: 1, actor: changedActor, body: edited }, h.dependencies))
+      .rejects.toThrow('번역 본문이 누락');
+    expect(h.writes).toHaveLength(0);
+  }
+});
+
+test('title-only queue failure keeps incomplete manual locales failed', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const h = harness(existing);
+  const dependencies = { ...h.dependencies,
+    enqueueTranslationJob: async () => { throw new Error('queue unavailable'); },
+  } as ExperienceWriteDependencies;
+  await updateExperienceFromBody({ experienceId: 1, actor, body: edited }, dependencies);
+  expect(h.writes).toHaveLength(2);
+  expect((h.writes[1].translation_meta as Record<string, { status: string }>).en.status).toBe('failed');
+  expect((h.writes[1].translation_meta as Record<string, { status: string }>).ja.status).toBe('failed');
+  expect((h.writes[1].translation_meta as Record<string, { status: string }>).zh.status).toBe('failed');
+});
+
+test('a concurrent translation version change stops the title update before enqueue', async () => {
+  const { existing, edited } = await pendingManualBodyFixture();
+  const h = harness(existing, true);
+  await expect(updateExperienceFromBody({ experienceId: 1, actor, body: edited }, h.dependencies))
+    .rejects.toThrow('새로고침 후 다시 저장');
+  expect(h.filters).toContainEqual(['translation_version', 1]);
+  expect(h.queues).toBe(0);
 });
 for (const locale of ['ja', 'zh'] as const) test(`new ${locale} source stores no Korean fixed-policy literal`, async () => {
   const ja = locale === 'ja';

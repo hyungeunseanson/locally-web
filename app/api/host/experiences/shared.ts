@@ -283,6 +283,42 @@ function mergeManualContentWithExisting(params: {
   return next;
 }
 
+function isPendingAdminKoreanTitleOnlyUpdate(params: {
+  actor: RouteActor;
+  existing: Record<string, unknown>;
+  input: NormalizedExperienceWriteInput;
+  existingManualContent: ManualContent;
+  nextManualContent: ManualContent;
+  existingManualLocales: ExperienceLocale[];
+  sourceContentDirty: boolean;
+}) {
+  const { actor, existing, input, existingManualContent, nextManualContent, existingManualLocales, sourceContentDirty } = params;
+  const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+  const oldKorean = existingManualContent.ko;
+  const newKorean = nextManualContent.ko;
+
+  return actor.isAdmin && existing.status === 'pending'
+    && existing.source_locale === 'ko' && input.sourceLocale === 'ko'
+    && !sourceContentDirty
+    && same(existingManualLocales, input.requestedManualLocales)
+    && asTrimmedString(existing.title) === oldKorean?.title.trim()
+    && Boolean(newKorean?.title.trim() && newKorean.title.trim() !== oldKorean?.title.trim())
+    && newKorean?.description.trim() === oldKorean?.description.trim()
+    && existingManualLocales.every((locale) => locale === 'ko' || same(nextManualContent[locale], existingManualContent[locale]))
+    && asTrimmedString(existing.country) === input.country
+    && asTrimmedString(existing.city) === input.city
+    && same(normalizeLanguageLevels(existing.language_levels, existing.languages ?? [], 3), input.languageLevels)
+    && same(existing.languages, getLanguageNames(input.languageLevels))
+    && same(existing.photos, input.photos)
+    && asTrimmedString(existing.location) === input.location
+    && Number(existing.duration) === input.duration
+    && Number(existing.max_guests) === input.maxGuests
+    && Number(existing.price) === input.price
+    && Number(existing.solo_guarantee_price ?? DEFAULT_SOLO_GUARANTEE_PRICE) === input.soloGuaranteePrice
+    && Boolean(existing.is_private_enabled) === input.isPrivateEnabled
+    && Number(existing.private_price ?? 0) === input.privatePrice;
+}
+
 function didManualContentChange(
   left: ManualContent,
   right: ManualContent,
@@ -725,7 +761,7 @@ export async function updateExperienceFromBody(params: {
 
   const { data: existing, error: existingError } = await supabaseAdmin
     .from('experiences')
-    .select('id, host_id, status, is_active, photos, image_url, media_revision, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, solo_guarantee_price')
+    .select('id, host_id, status, is_active, country, city, languages, language_levels, duration, max_guests, location, photos, image_url, media_revision, price, solo_guarantee_price, is_private_enabled, private_price, translation_version, source_locale, manual_locales, title, description, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n')
     .eq('id', experienceId)
     .maybeSingle();
 
@@ -761,6 +797,15 @@ export async function updateExperienceFromBody(params: {
   const nextSourceContent = input.sourceContent;
   const sourceContentDirty = existingSourceLocale !== input.sourceLocale
     || didSourceTranslationContentChange(existingSourceContent, nextSourceContent);
+  const pendingAdminKoreanTitleOnly = isPendingAdminKoreanTitleOnlyUpdate({
+    actor,
+    existing: existing as Record<string, unknown>,
+    input,
+    existingManualContent,
+    nextManualContent,
+    existingManualLocales,
+    sourceContentDirty,
+  });
   const translationDirty = existingSourceLocale !== input.sourceLocale
     || !areExperienceLocaleArraysEqual(existingManualLocales, mergedManualLocales)
     || didManualContentChange(existingManualContent, nextManualContent, mergedManualLocales)
@@ -777,6 +822,7 @@ export async function updateExperienceFromBody(params: {
     existingManualLocales,
     sourceContentDirty,
   });
+  const incompleteManualLocales: ExperienceLocale[] = [];
   if (translationDirty && !sourceContentDirty) {
     // These manual body maps are retained rather than replaced by a provider.
     // Validate only actual stored target leaves, never a cross-locale fallback.
@@ -795,11 +841,17 @@ export async function updateExperienceFromBody(params: {
       if (integrity.outcome === 'CLEAR_LANGUAGE_MISMATCH') throw new LocaleIntegrityError(integrity.issues);
       const missingFields = findMissingExperienceBodyFields(nextSourceContent, targetBody);
       if (missingFields.length) {
-        throw new ApiError(400, `선택한 언어(${locale})의 번역 본문이 누락되었습니다. ${missingFields[0]} 내용을 확인해주세요.`);
+        if (!pendingAdminKoreanTitleOnly) {
+          throw new ApiError(400, `선택한 언어(${locale})의 번역 본문이 누락되었습니다. ${missingFields[0]} 내용을 확인해주세요.`);
+        }
+        incompleteManualLocales.push(locale);
       }
       localeIntegrityWarnings.push(...integrity.issues);
     }
   }
+  const manualLocalesNeedingReview = pendingAdminKoreanTitleOnly
+    ? mergedManualLocales.filter((locale) => locale !== input.sourceLocale && !incompleteManualLocales.includes(locale))
+    : [];
   const translationState = buildExperienceTranslationState({
     sourceLocale: input.sourceLocale,
     manualContent: nextManualContent,
@@ -808,12 +860,26 @@ export async function updateExperienceFromBody(params: {
     translationVersion,
     queuedLocales,
   });
+  if (pendingAdminKoreanTitleOnly) {
+    // A retained manual title has not been reviewed against the new Korean title.
+    // Keep its content, but never certify it at the new source version.
+    for (const locale of mergedManualLocales) {
+      if (locale !== input.sourceLocale) {
+        translationState.translationMeta[locale] = { mode: 'manual', status: 'failed', version: translationVersion };
+      }
+    }
+  }
   const languageNames = getLanguageNames(input.languageLevels);
   const existingStatus = typeof existing.status === 'string' ? existing.status : '';
   const shouldResubmitForReview = !actor.isAdmin
     && (existingStatus === 'revision' || existingStatus === 'rejected');
 
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: Record<string, unknown> = pendingAdminKoreanTitleOnly ? {
+    title: translationState.canonicalTitle,
+    title_ko: translationState.canonicalTitle,
+    translation_version: translationVersion,
+    translation_meta: translationState.translationMeta,
+  } : {
     country: input.country,
     city: input.city,
     category: input.category,
@@ -840,7 +906,7 @@ export async function updateExperienceFromBody(params: {
     updatePayload.status = 'pending';
   }
 
-  if (translationDirty) {
+  if (translationDirty && !pendingAdminKoreanTitleOnly) {
     Object.assign(updatePayload, buildExperienceTranslationUpdateFields({
       sourceLocale: input.sourceLocale,
       translationVersion,
@@ -854,6 +920,10 @@ export async function updateExperienceFromBody(params: {
     .update(updatePayload)
     .eq('id', experienceId)
     .eq('media_revision', existing.media_revision ?? 0);
+
+  if (pendingAdminKoreanTitleOnly) {
+    updateQuery = updateQuery.eq('status', 'pending').eq('translation_version', existing.translation_version);
+  }
 
   if (!actor.isAdmin) {
     // [CRITICAL FIX] query builder는 immutable — 반드시 재할당해야 host_id 필터가 실제 쿼리에 반영됨
@@ -886,14 +956,23 @@ export async function updateExperienceFromBody(params: {
       dependencies.scheduleTranslationProducer();
     } catch (queueError) {
       console.error('[Experience API] Failed to enqueue translation job:', queueError);
-      await dependencies.markTranslationQueueFailure({
-        supabaseAdmin,
-        experienceId,
-        version: translationVersion,
-        manualLocales: translationState.manualLocales,
-        autoLocales: translationState.autoLocales,
-        queuedLocales: translationState.queuedLocales,
-      });
+      if (pendingAdminKoreanTitleOnly) {
+        const failedMeta = { ...translationState.translationMeta };
+        for (const locale of translationState.queuedLocales) {
+          failedMeta[locale] = { mode: 'ai', status: 'failed', version: translationVersion };
+        }
+        await supabaseAdmin.from('experiences').update({ translation_meta: failedMeta })
+          .eq('id', experienceId).eq('translation_version', translationVersion);
+      } else {
+        await dependencies.markTranslationQueueFailure({
+          supabaseAdmin,
+          experienceId,
+          version: translationVersion,
+          manualLocales: translationState.manualLocales,
+          autoLocales: translationState.autoLocales,
+          queuedLocales: translationState.queuedLocales,
+        });
+      }
     }
   }
 
@@ -922,6 +1001,8 @@ export async function updateExperienceFromBody(params: {
   return {
     id: data.id,
     localeIntegrityWarnings,
+    incompleteManualLocales,
+    manualLocalesNeedingReview,
     queuedLocales: translationDirty ? translationState.queuedLocales : [],
   };
 }

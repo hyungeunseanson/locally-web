@@ -3,6 +3,13 @@ import type { sendImmediateGenericEmail } from '@/app/utils/emailNotificationJob
 import type { schedulePublicExperienceMediaProducer } from '@/app/utils/publicExperienceMediaQueueProducer.server';
 import type { createAdminClient, recordAuditLog } from '@/app/utils/supabase/admin';
 import type { PublicExperienceMediaRow } from '@/app/utils/publicExperienceMediaQueueMirror';
+import { findMissingExperienceBodyFields } from '@/app/utils/experienceTranslation/integrity';
+import {
+  buildSourceTranslationContent,
+  buildSourceTranslationContentFromExperience,
+  normalizeExperienceLocaleArray,
+  isExperienceLocale,
+} from '@/app/utils/experienceTranslation';
 
 type AdminSessionClient = {
   auth: {
@@ -57,6 +64,9 @@ export async function executeUpdateExperienceAdminStatus(
 
   let targetTitle = targetId;
   let mediaBefore: PublicExperienceMediaRow | null = null;
+  let checkedTranslationVersion: number | null = null;
+  let checkedStatus: string | null = null;
+  let checkedTranslationMeta: unknown = null;
   try {
     const { data } = await supabaseAdmin
       .from('experiences')
@@ -71,19 +81,65 @@ export async function executeUpdateExperienceAdminStatus(
     // The existing status update remains authoritative even if display metadata cannot be loaded.
   }
 
+  if (['active', 'approved'].includes(status.trim().toLowerCase())) {
+    const { data: translationRow, error: translationError } = await supabaseAdmin
+      .from('experiences')
+      .select('status, translation_version, source_locale, manual_locales, title_ko, title_en, title_ja, title_zh, description_ko, description_en, description_ja, description_zh, category, meeting_point, meeting_point_i18n, supplies, supplies_i18n, inclusions, inclusions_i18n, exclusions, exclusions_i18n, itinerary, itinerary_i18n, rules, rules_i18n, translation_meta')
+      .eq('id', id)
+      .maybeSingle();
+    if (translationError || !translationRow) {
+      throw new Error('체험 번역 상태를 확인할 수 없습니다.');
+    }
+    const row = translationRow as Record<string, unknown>;
+    checkedStatus = String(row.status ?? '');
+    checkedTranslationVersion = Number(row.translation_version);
+    if (!Number.isInteger(checkedTranslationVersion)) {
+      throw new Error('체험 번역 버전을 확인할 수 없습니다.');
+    }
+    const sourceLocale = isExperienceLocale(row.source_locale) ? row.source_locale : 'ko';
+    const sourceBody = buildSourceTranslationContentFromExperience(row, sourceLocale);
+    for (const locale of normalizeExperienceLocaleArray(row.manual_locales)) {
+      if (locale === sourceLocale) continue;
+      const targetBody = buildSourceTranslationContent({
+        category: row.category,
+        meetingPoint: (row.meeting_point_i18n as Record<string, unknown> | null)?.[locale],
+        supplies: (row.supplies_i18n as Record<string, unknown> | null)?.[locale],
+        inclusions: (row.inclusions_i18n as Record<string, unknown> | null)?.[locale],
+        exclusions: (row.exclusions_i18n as Record<string, unknown> | null)?.[locale],
+        itinerary: (row.itinerary_i18n as Record<string, unknown> | null)?.[locale],
+        rules: (row.rules_i18n as Record<string, unknown> | null)?.[locale],
+      });
+      const missing = findMissingExperienceBodyFields(sourceBody, targetBody);
+      if (!String(row[`title_${locale}`] ?? '').trim()) missing.push('title');
+      if (!String(row[`description_${locale}`] ?? '').trim()) missing.push('description');
+      const meta = (row.translation_meta as Record<string, { mode?: string; status?: string; version?: number }> | null)?.[locale];
+      if (missing.length || meta?.mode !== 'manual' || meta.status !== 'ready' || meta.version !== checkedTranslationVersion) {
+        throw new Error(`선택한 언어(${locale})의 번역을 보완한 뒤 승인해주세요.`);
+      }
+      checkedTranslationMeta = row.translation_meta;
+    }
+  }
+
   const updateData: { status: string; admin_comment?: string } = { status };
   if (trimmedComment) {
     updateData.admin_comment = trimmedComment;
   }
 
-  const { data: updatedExperience, error } = await supabaseAdmin
+  let updateQuery = supabaseAdmin
     .from('experiences')
     .update(updateData)
-    .eq('id', id)
+    .eq('id', id);
+  if (checkedTranslationVersion !== null) {
+    updateQuery = updateQuery.eq('translation_version', checkedTranslationVersion).eq('status', checkedStatus);
+    if (checkedTranslationMeta !== null) {
+      updateQuery = updateQuery.eq('translation_meta', JSON.stringify(checkedTranslationMeta));
+    }
+  }
+  const { data: updatedExperience, error } = await updateQuery
     .select('id, status, is_active, photos, itinerary, image_url')
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!updatedExperience) throw new Error('Experience not found');
+  if (!updatedExperience) throw new Error('체험이 변경되었습니다. 새로고침 후 다시 승인해주세요.');
 
   dependencies.scheduleMediaProducer({
     before: mediaBefore,
