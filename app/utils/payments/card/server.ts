@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { assertNicePayApprovalNotRetired } from './targetedCloseoutTargets';
 
 import { getPortOnePayment, isPortOneCardReady } from '@/app/utils/portone/server';
 
@@ -381,6 +382,7 @@ async function requestNicePayNetCancel(params: {
 async function verifyNicePayApprovedPayment(
   params: VerifyApprovedCardPaymentParams
 ): Promise<VerifiedCardPayment> {
+  assertNicePayApprovalNotRetired(params.orderId);
   const config = getNicePayRuntimeConfig();
   const providerPayload = normalizePayloadRecord(params.providerPayload);
   const authResultCode = getPayloadValue(providerPayload, ['AuthResultCode']);

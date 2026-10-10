@@ -20,6 +20,7 @@ export const OPS_ANOMALY_THRESHOLDS = {
   queueMainCriticalAgeMinutes: 60,
   queueDlqCriticalCount: 10,
   criticalRealertCooldownMinutes: 24 * 60,
+  notificationRealertCooldownMinutes: 60,
 } as const;
 
 export const OPS_ANOMALY_QUEUE_CONTRACT = [
@@ -33,6 +34,10 @@ export const OPS_ANOMALY_DEFINITIONS: Record<
   OpsAnomalyDiagnosticCode,
   { severity: OpsAnomalySeverity; title: string }
 > = {
+  targeted_card_recovery_a: { severity: 'critical', title: 'A 미해결 금융 증거 확인 필요' },
+  targeted_card_recovery_b: { severity: 'critical', title: 'B 미해결 금융 증거 확인 필요' },
+  targeted_card_notification_a: { severity: 'warning', title: 'A 미검증 통보 운영 확인 필요' },
+  targeted_card_notification_b: { severity: 'warning', title: 'B 미검증 통보 운영 확인 필요' },
   payment_reconciliation_required: {
     severity: 'critical',
     title: '결제 reconciliation 확인 필요',

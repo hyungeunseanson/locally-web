@@ -18,6 +18,8 @@ import {
   verifyCardPaymentNotification,
 } from '@/app/utils/payments/card/server';
 import { createAdminClient } from '@/app/utils/supabase/admin';
+import { isTargetedNicePayCloseout } from '@/app/utils/payments/card/targetedCloseoutTargets';
+import { recordTargetedNicePayNotification } from '@/app/utils/payments/card/targetedNicePayCloseout';
 
 type NotificationTarget = 'experience' | 'service' | 'proxy';
 
@@ -184,6 +186,23 @@ async function processExperienceNotification(params: {
 
   if (!booking) {
     return null;
+  }
+
+  if (isTargetedNicePayCloseout(booking.order_id || booking.id)) {
+    if (notification.orderId !== booking.id) {
+      return NextResponse.json({ success: false, error: 'TARGETED_CARD_NOTIFICATION_ANCHOR_CONFLICT' }, { status: 409 });
+    }
+    // Public envelope is audit-only: its RPC cannot create a financial incident.
+    try {
+      const receipt = await recordTargetedNicePayNotification({ supabaseAdmin, notification });
+      if (receipt.stored) return buildNotificationOkResponse();
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== 'TARGETED_CARD_RECOVERY_DB_UNAVAILABLE') throw error;
+    }
+    // Neither capacity rejection nor a failed/uncertain DB write is an ACK.
+    return new NextResponse('TARGETED_CARD_NOTIFICATION_RETRY_REQUIRED', {
+      status: 503, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' },
+    });
   }
 
   if (isNicePayPostCancellationNotification(notification)) {

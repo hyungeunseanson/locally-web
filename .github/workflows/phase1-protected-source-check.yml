@@ -1,0 +1,40 @@
+name: PHASE1 Protected Source Contracts
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  financial-v2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.20.0
+          cache: npm
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Install isolated PostgreSQL fixture
+        run: npm install --prefix "$RUNNER_TEMP/phase1-pg17" --no-audit --no-fund embedded-postgres@17.6.0-beta.15 pg@8.16.3 esbuild@0.25.10
+      - name: Install pinned official PostgREST
+        run: |
+          curl --fail --location --retry 0 https://github.com/PostgREST/postgrest/releases/download/v16.4/postgrest-v16.4-linux-static-x86-64.tar.xz -o "$RUNNER_TEMP/postgrest.tar.xz"
+          echo "b47ecc82fce1dcebbbc4183d839e52f07f7630c9d7ad0f54db753d1939299354  $RUNNER_TEMP/postgrest.tar.xz" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/postgrest.tar.xz" -C "$RUNNER_TEMP"
+      - name: Replay protection and installed V2 on synthetic local data only
+        env:
+          TARGETED_LEGACY_REVISION: e4933ce1c00707b792e69911a0791726a6a7e956
+          LOCAL_POSTGREST_BINARY: ${{ runner.temp }}/postgrest
+        run: node scripts/diagnostics/targeted-card-closeout-v2-local.mjs --runtime "$RUNNER_TEMP/phase1-pg17"
+      - name: Verify actual helpers in isolated workerd
+        run: node scripts/diagnostics/targeted-card-closeout-worker.mjs
+      - name: Verify monitoring, admin notification and cooldown contracts
+        run: npx playwright test -c playwright.phase1-gate.config.ts tests/e2e/266-ops-anomaly-monitor.spec.ts --workers=1
+      - run: npx tsc --noEmit
+      - run: git diff --check

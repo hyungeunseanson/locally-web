@@ -427,6 +427,7 @@ test.describe('Ops Anomaly Monitor', () => {
     let rpcArguments: Record<string, unknown> | undefined;
     const client = {
       rpc: async (_name: string, args: Record<string, unknown>) => {
+        if (_name === 'get_targeted_card_ops_snapshot') return { data: [], error: null };
         rpcArguments = args;
         return { data: rows, error: null };
       },
@@ -917,4 +918,91 @@ test.describe('Ops Anomaly Monitor', () => {
       '31 19 * * *',
     ]));
   });
+});
+
+test('targeted financial incident duplicates suppress, new events re-alert, acknowledgement stays unresolved', () => {
+  const first = { ...anomaly('targeted_card_recovery_a'), aggregateDetails: { verified: 1, incident_version: 10, unassigned: 1 } };
+  const initial = planOpsAnomalyNotifications({ anomalies: [first], previousState: { activeDiagnostics: [], alertedAtByCode: {} }, observedAt });
+  expect(initial.alertDiagnostics).toEqual(['targeted_card_recovery_a']);
+  const acknowledged = { ...first, aggregateDetails: { verified: 1, incident_version: 10, unassigned: 0 } };
+  const same = planOpsAnomalyNotifications({ anomalies: [acknowledged], previousState: initial.nextState, observedAt: new Date(observedAt.getTime() + 60_000) });
+  expect(same.alertDiagnostics).toEqual([]);
+  expect(same.nextState.activeDiagnostics).toEqual(['targeted_card_recovery_a']);
+  const next = planOpsAnomalyNotifications({ anomalies: [{ ...first, aggregateDetails: { unknown: 1, incident_version: 11 } }], previousState: same.nextState, observedAt: new Date(observedAt.getTime() + 120_000) });
+  expect(next.alertDiagnostics).toEqual(['targeted_card_recovery_a']);
+  expect(next.emailDiagnostics).toEqual(['targeted_card_recovery_a']);
+  const reminder = planOpsAnomalyNotifications({ anomalies: [acknowledged], previousState: same.nextState, observedAt: new Date(observedAt.getTime() + 24 * 60 * 60_000) });
+  expect(reminder.alertDiagnostics).toEqual(['targeted_card_recovery_a']);
+  const resolved = planOpsAnomalyNotifications({ anomalies: [], previousState: same.nextState, observedAt });
+  expect(resolved.nextState.activeDiagnostics).toEqual([]);
+});
+
+test('targeted snapshot participates in existing ops warnings independently of released booking claim', async () => {
+  const calls: string[] = [];
+  const result = await loadDatabaseOpsAnomalies({ supabaseAdmin: { rpc: async (name: string) => {
+    calls.push(name);
+    return { data: name === 'get_ops_anomaly_snapshot' ? [] : [{ diagnostic_code: 'targeted_card_recovery_b', anomaly_count: '1', oldest_observed_at: observedAt.toISOString(), aggregate_details: { accepted: 1, incident_version: 17 } }], error: null };
+  } } as never, observedAt });
+  expect(calls).toEqual(['get_ops_anomaly_snapshot','get_targeted_card_ops_snapshot']);
+  expect(result[0]).toMatchObject({ diagnosticCode: 'targeted_card_recovery_b', severity: 'critical', aggregateDetails: { accepted: 1, incident_version: 17 } });
+  await expect(loadDatabaseOpsAnomalies({ supabaseAdmin: { rpc: async (name: string) => ({ data: [], error: name === 'get_targeted_card_ops_snapshot' ? { message: 'synthetic failure' } : null }) } as never, observedAt })).rejects.toThrow('ops_anomaly_targeted_snapshot_failed');
+});
+
+test('targeted event versions persist across monitor runs and alert reading cannot resolve finance', async () => {
+  const prior = { active_diagnostics: ['targeted_card_recovery_a'], alerted_at_by_code: { targeted_card_recovery_a: observedAt.toISOString() }, financial_event_version_by_code: { targeted_card_recovery_a: 10 } };
+  for (const version of [10,11]) {
+    const calls: string[] = [];
+    const updates: Record<string, unknown>[] = [];
+    const copies: string[] = [];
+    const result = await runOpsAnomalyMonitor({
+      supabaseAdmin: createProcessorClient({ calls, updates, previousDetails: prior }) as never,
+      queueRuntime: productionEnvironment, emailEnv: productionEnvironment, triggerSource: 'cron',
+      dependencies: {
+        now: () => new Date(observedAt.getTime() + 60_000),
+        collectAnomalies: async () => [{ ...anomaly('targeted_card_recovery_a'), aggregateDetails: { accepted: 1, incident_version: version, unassigned: 0 } }],
+        insertAlert: async copy => { copies.push(copy.message); return { count: 1, targetCount: 1 }; },
+        sendEmail: async () => ({ count: 1, targetCount: 1 }),
+      },
+    });
+    expect(result).toMatchObject({ success: true, alertCount: version === 10 ? 0 : 1 });
+    const completed = updates.find(update => update.status === 'success');
+    expect(completed?.details).toMatchObject({ active_diagnostics: ['targeted_card_recovery_a'], financial_event_version_by_code: { targeted_card_recovery_a: version } });
+    if (version === 11) expect(copies[0]).toContain('accepted=1');
+    if (version === 11) expect(copies[0]).toContain('담당자 확인은 해결 처리가 아닙니다');
+  }
+});
+
+
+test('targeted notification inbox warns and reminds hourly without financial email authority or alert flood', async () => {
+  const notice = { ...anomaly('targeted_card_notification_a', 'warning'), aggregateDetails: { unreviewed: 1, stored: 1, notice_version: 1 } };
+  const initial = planOpsAnomalyNotifications({ anomalies: [notice], previousState: { activeDiagnostics: [], alertedAtByCode: {} }, observedAt });
+  expect(initial.alertDiagnostics).toEqual(['targeted_card_notification_a']);
+  expect(initial.emailDiagnostics).toEqual([]);
+  const more = { ...notice, aggregateDetails: { unreviewed: 512, stored: 512, notice_version: 512, capacity_exhausted: 0 } };
+  const repeated = planOpsAnomalyNotifications({ anomalies: [more], previousState: initial.nextState, observedAt: new Date(observedAt.getTime() + 60_000) });
+  expect(repeated.alertDiagnostics).toEqual([]);
+  const capacity = { ...more, aggregateDetails: { ...more.aggregateDetails, notice_version: 513, capacity_exhausted: 1 } };
+  const exhausted = planOpsAnomalyNotifications({ anomalies: [capacity], previousState: repeated.nextState, observedAt: new Date(observedAt.getTime() + 120_000) });
+  expect(exhausted.alertDiagnostics).toEqual(['targeted_card_notification_a']);
+  expect(exhausted.emailDiagnostics).toEqual([]);
+  const exhaustedReplay = planOpsAnomalyNotifications({ anomalies: [capacity], previousState: exhausted.nextState, observedAt: new Date(observedAt.getTime() + 180_000) });
+  expect(exhaustedReplay.alertDiagnostics).toEqual([]);
+  const reminder = planOpsAnomalyNotifications({ anomalies: [more], previousState: repeated.nextState, observedAt: new Date(observedAt.getTime() + 60 * 60_000) });
+  expect(reminder.alertDiagnostics).toEqual(['targeted_card_notification_a']);
+  expect(reminder.emailDiagnostics).toEqual([]);
+  const reviewed = planOpsAnomalyNotifications({ anomalies: [], previousState: reminder.nextState, observedAt });
+  const subsequent = planOpsAnomalyNotifications({ anomalies: [more], previousState: reviewed.nextState, observedAt });
+  expect(subsequent.alertDiagnostics).toEqual(['targeted_card_notification_a']);
+  const updates: Record<string, unknown>[] = [];
+  const copies: string[] = [];
+  const result = await runOpsAnomalyMonitor({ supabaseAdmin: createProcessorClient({ calls: [], updates }) as never,
+    queueRuntime: productionEnvironment, emailEnv: productionEnvironment, triggerSource: 'cron',
+    dependencies: { now: () => observedAt, collectAnomalies: async () => [notice],
+      insertAlert: async copy => { copies.push(copy.message); return { count: 1, targetCount: 1 }; },
+      sendEmail: async () => { throw new Error('inbox must not dispatch financial email'); },
+    },
+  });
+  expect(result).toMatchObject({ success: true, alertCount: 1, emailCount: 0 });
+  expect(copies[0]).toContain('금융 사고 확정이나 환불 권한이 아닙니다');
+  expect(updates.find(u => u.status === 'success')?.details).toMatchObject({ notification_event_version_by_code: { targeted_card_notification_a: 1 }, financial_event_version_by_code: {} });
 });
