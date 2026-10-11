@@ -4,7 +4,7 @@
 
 - 운영 Worker의 공개 경로와 익명 권한을 **읽기 전용**으로 확인한다.
 - Auth 사용자·역할·화이트리스트, 알림, 분석 이벤트, 예약을 만드는 기존 E2E는 동일한 **격리 Supabase Auth/DB 및 로컬 앱**에서 계속 실행한다.
-- 릴리스 검증은 운영 `gate`와 격리 `baseline`이 모두 PASS일 때만 완료된다. 어느 한쪽이 미실행이면 `VERIFICATION_INCOMPLETE`로 기록한다.
+- 릴리스 검증은 운영 `gate`, 격리 `baseline`, 격리 데이터 정리가 모두 PASS일 때만 완료된다. 어느 한쪽이 미실행이거나 실패하면 `VERIFICATION_INCOMPLETE`로 기록한다.
 - 기존 `69-admin-role-access.spec.ts`와 다른 쓰기 테스트는 삭제하거나 성공으로 대체하지 않는다.
 
 ## Bundles and side effects
@@ -29,6 +29,8 @@ npm run test:e2e:isolated:noisy
 
 격리 실행에는 해당 작업 트리의 `.env.local`에 **로컬 Supabase URL·anon key·service role key와 `NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3100`**이 필요하다. 실행기는 브라우저와 앱을 `127.0.0.1:3100`에 고정하고 자체 서버를 시작하며 기존 서버를 재사용하지 않는다. Supabase URL은 loopback이어야 한다. 프로덕션 URL·키, 원격 앱/로컬 DB 혼합, 로컬 앱/운영 DB 혼합은 거부한다. 격리 Auth·스키마·RLS·필요한 체험 fixture가 실제 준비되지 않았다면 `NOT_RUN_ENVIRONMENT_BLOCKED`로 기록한다.
 
+격리 스택은 새 임시 디렉터리에서 Supabase CLI로 초기화하고 이 저장소의 `supabase/migrations`만 복사해 구성한다. 로컬 Auth redirect와 앱 origin은 `http://127.0.0.1:3100`으로 맞춘다. Apple Silicon에서 Docker가 없으면 CLI의 `--runtime native`를 사용할 수 있다. CLI가 새로 발급한 로컬 키만 비추적 `.env.local`에 넣고, 운영 환경변수·사용자·데이터는 복사하지 않는다. 검색/상세 테스트 `43`에는 `approved` 호스트와 `active` 체험의 합성 fixture 1건이 필요하다. 테스트별 Auth fixture 정리와 별개로 익명 검색/분석 이벤트 및 이 합성 fixture가 남을 수 있으므로, 결과 확인 후 **임시 격리 스택 전체를 폐기**하고 잔여 데이터가 없음을 확인한다. 스택 폐기 전에는 cleanup을 PASS로 기록하지 않는다.
+
 운영 관리자 UI는 기존에 승인된 계정과 세션을 안전하게 사용할 수 있을 때 **읽기 전용**으로 별도 확인한다. 합성 사용자 생성, 역할·화이트리스트 변경, 체험 저장·승인은 운영 smoke에 포함하지 않는다. 관리자 UI를 확인하지 못했다면 그 범위를 보고하고 PASS로 기록하지 않는다.
 
 ## Execution and cleanup boundary
@@ -37,7 +39,7 @@ npm run test:e2e:isolated:noisy
 2. 격리 Auth·DB·앱에서 `baseline`을 실행해 권한 상승, 화이트리스트 해제·권한 회수, 알림·분석·호스트 경로를 검증한다.
 3. 격리 데이터 정리를 확인하고, 필요한 경우 `shared`·`noisy`를 별도로 실행한다.
 4. 운영 계정의 읽기 전용 관리자 UI 확인 가능 여부를 기록한다.
-5. `gate`와 `baseline`이 모두 PASS가 아니면 릴리스 검증은 `VERIFICATION_INCOMPLETE`다.
+5. `gate`, `baseline`, 격리 데이터 정리 중 하나라도 PASS가 아니면 릴리스 검증은 `VERIFICATION_INCOMPLETE`다.
 
 과거 `cleanup:codex:*:execute` 명령은 운영 데이터 삭제 가능성이 있으므로 이 검증 절차에서 실행하지 않는다. 격리 테스트의 자체 정리와 격리 DB 확인만 사용한다. 운영 DB에 대한 SQL은 읽기 전용 확인에 한정한다.
 

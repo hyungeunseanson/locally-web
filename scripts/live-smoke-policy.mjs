@@ -18,7 +18,7 @@ export const BUNDLES = {
       'tests/e2e/71-public-host-profile.spec.ts',
     ],
     sideEffects: 'Isolated Auth users, analytics, notifications, admin roles, host and booking fixtures.',
-    cleanupExpectation: 'All test-created rows and Auth users are removed from the isolated database.',
+    cleanupExpectation: 'Auth fixtures are removed by tests; anonymous search/analytics rows and the seed fixture require disposable stack teardown.',
     config: 'playwright.isolated-release.config.ts',
     requires: 'isolated',
   },
