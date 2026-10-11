@@ -143,11 +143,11 @@ async function seed() {
   `);
 }
 
-test('actual sitemap restores only active experiences with the latest approved/active host', async () => {
+test('actual sitemap restores only active experiences with the latest approved host', async () => {
   await seed();
   const entries = await sitemap();
   assert.deepEqual(entries.filter((e) => e.url.includes('/experiences/')).map((e) => e.url), [
-    'https://www.locally-travel.com/experiences/1', 'https://www.locally-travel.com/experiences/2',
+    'https://www.locally-travel.com/experiences/1',
   ]);
   for (const entry of entries.filter((e) => e.url.includes('/experiences/'))) {
     assert(!Object.hasOwn(entry, 'lastModified'));
@@ -171,12 +171,14 @@ test('static/community/host membership, legacy-board fallback and existing dates
   assert.deepEqual(entries.filter((e) => e.url.includes('/community/')).map((e) => e.url).sort(),
     ['content', 'japan', 'korea'].map((id) => `https://www.locally-travel.com/community/${id}`));
   assert.deepEqual(entries.filter((e) => e.url.includes('/users/')).map((e) => e.url).sort(),
-    ['host-b', 'host-c'].map((id) => `https://www.locally-travel.com/users/${id}`));
+    ['host-b'].map((id) => `https://www.locally-travel.com/users/${id}`));
   assert.equal(entries.find((e) => e.url.endsWith('/community/content')).lastModified.toISOString(), '2026-02-03T00:00:00.000Z');
   assert.equal(entries.find((e) => e.url.endsWith('/users/host-b')).lastModified.toISOString(), '2026-02-01T00:00:00.000Z');
   const xml = resolveRouteData(entries, 'sitemap');
   assert(xml.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'));
   assert(xml.includes('<loc>https://www.locally-travel.com/experiences/1</loc>'));
+  assert(!xml.includes('/experiences/2</loc>'));
+  assert(!xml.includes('/users/host-c</loc>'));
   assert(!xml.match(/<url>\s*<loc>[^<]*\/experiences\/[^<]*<\/loc>\s*<lastmod>/));
   assert(!xml.includes('undefined'));
 });
@@ -321,13 +323,15 @@ test(`real ${workerRuntime ? 'OpenNext Worker' : 'Next'} HTTP route returns 500 
     assert.match(healthy.headers.get('content-type'), /xml/);
     const xml = await healthy.text();
     const parsed = spawnSync('python3', ['-c',
-      'import sys,xml.etree.ElementTree as ET; from urllib.parse import urlparse; r=ET.fromstring(sys.stdin.read()); assert r.tag=="{http://www.sitemaps.org/schemas/sitemap/0.9}urlset"; urls=[n.text for n in r.findall("{*}url/{*}loc")]; assert len(urls)==22; assert all(urlparse(u).scheme=="https" and urlparse(u).netloc=="www.locally-travel.com" for u in urls)'],
+      'import sys,xml.etree.ElementTree as ET; from urllib.parse import urlparse; r=ET.fromstring(sys.stdin.read()); assert r.tag=="{http://www.sitemaps.org/schemas/sitemap/0.9}urlset"; urls=[n.text for n in r.findall("{*}url/{*}loc")]; assert len(urls)==20; assert all(urlparse(u).scheme=="https" and urlparse(u).netloc=="www.locally-travel.com" for u in urls)'],
     { input: xml, encoding: 'utf8' });
     assert.equal(parsed.status, 0, parsed.stderr);
-    assert.equal((xml.match(/<url>/g) || []).length, 22);
+    assert.equal((xml.match(/<url>/g) || []).length, 20);
     assert(xml.includes('<loc>https://www.locally-travel.com/experiences/1</loc>'));
     assert(!xml.includes('/experiences/3</loc>'));
+    assert(!xml.includes('/experiences/2</loc>'));
     assert(!xml.includes('/users/host-a</loc>'));
+    assert(!xml.includes('/users/host-c</loc>'));
     const previousRequests = requests.length;
     fault.table = 'experiences';
     const cached = await fetch(`http://127.0.0.1:${port}/sitemap.xml`);

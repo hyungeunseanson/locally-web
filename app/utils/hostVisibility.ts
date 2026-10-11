@@ -1,4 +1,4 @@
-export const PUBLIC_HOST_APPLICATION_VISIBLE_STATUSES = ['approved', 'active'] as const;
+export const PUBLIC_HOST_APPLICATION_VISIBLE_STATUSES = ['approved'] as const;
 
 const PUBLIC_HOST_APPLICATION_VISIBLE_STATUS_SET = new Set<string>(PUBLIC_HOST_APPLICATION_VISIBLE_STATUSES);
 

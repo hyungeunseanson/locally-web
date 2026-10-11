@@ -258,11 +258,14 @@ test.describe.serial('Public service-role route contracts', () => {
       throw viewError;
     }
 
-    const matchingPendingRow = (viewRows ?? []).find((row) => String(row.id) === latestPendingId);
-    expect(matchingPendingRow).toMatchObject({
-      user_id: hostId,
-      status: 'pending',
-    });
+    expect(viewRows).toEqual([]);
+    const { data: latestPending, error: pendingError } = await getAdminClient()
+      .from('host_applications')
+      .select('id, user_id, status')
+      .eq('id', latestPendingId)
+      .single();
+    if (pendingError) throw pendingError;
+    expect(latestPending).toMatchObject({ user_id: hostId, status: 'pending' });
 
     const response = await request.get(`/api/community/authors/${hostId}`);
     expect(response.status()).toBe(200);

@@ -36,11 +36,12 @@ test.describe('Public host visibility helpers', () => {
     expect(isLatestPublicHostApplication({ id: null }, { id: null })).toBe(false);
   });
 
-  test('treats only approved or active latest host applications as public', () => {
+  test('treats only approved latest host applications as public', () => {
     expect(isPublicHostApplicationStatus('approved')).toBe(true);
-    expect(isPublicHostApplicationStatus('active')).toBe(true);
+    expect(isPublicHostApplicationStatus('active')).toBe(false);
     expect(isPublicHostApplicationStatus('revision')).toBe(false);
     expect(isPublicHostApplicationStatus('pending')).toBe(false);
+    expect(isPublicHostApplicationStatus('rejected')).toBe(false);
 
     const visibleHostIds = getVisiblePublicHostIdSet([
       {

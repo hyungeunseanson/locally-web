@@ -34,6 +34,12 @@ function getAdminClient() {
   if (adminClient) return adminClient;
 
   const env = loadEnv();
+  const target = new URL(env.NEXT_PUBLIC_SUPABASE_URL);
+  if (target.protocol !== 'http:' || target.hostname !== '127.0.0.1' || !target.port
+    || env.NEXT_PUBLIC_SITE_URL !== 'http://127.0.0.1:3100'
+    || (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL !== target.href.replace(/\/$/, ''))) {
+    throw new Error('Public host fixture writes require the isolated loopback Supabase stack.');
+  }
   adminClient = createClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.SUPABASE_SERVICE_ROLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -120,7 +126,7 @@ async function createAuthUser(user: TestUser) {
 async function createHostApplication(
   userId: string,
   user: TestUser,
-  status: 'approved' | 'active' = 'approved'
+  status: 'approved' | 'active' | 'pending' | 'revision' | 'rejected' = 'approved'
 ) {
   const { data, error } = await getAdminClient()
     .from('host_applications')
@@ -156,6 +162,7 @@ async function createHostApplication(
   }
 
   createdApplicationIds.push(String(data.id));
+  return String(data.id);
 }
 
 async function createActiveExperience(
@@ -332,7 +339,7 @@ test.describe.serial('Public host profile', () => {
 
     const host = createHostUser();
     const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'active');
+    await createHostApplication(hostId, host, 'approved');
     const experience = await createActiveExperience(hostId);
     const guest = createGuestUser();
     const guestId = await createAuthUser(guest);
@@ -426,7 +433,7 @@ test.describe.serial('Public host profile', () => {
     await expect(page.getByTestId('public-review-modal').locator('[data-testid="public-review-photo"]')).toHaveCount(0);
   });
 
-  test('renders active host profiles through the same public projection path', async ({ page }) => {
+  test('keeps legacy active applications private across profile and review routes', async ({ page }) => {
     test.setTimeout(90000);
 
     const host = createHostUser();
@@ -434,13 +441,73 @@ test.describe.serial('Public host profile', () => {
     await createHostApplication(hostId, host, 'active');
     const experience = await createActiveExperience(hostId);
 
-    await page.goto(`/users/${hostId}`, { waitUntil: 'networkidle' });
+    expect((await page.request.get(`/api/public/hosts/${hostId}/reviews`)).status()).toBe(404);
+    expect((await page.request.get(`/api/public/experiences/${experience.experienceId}/reviews`)).status()).toBe(404);
+    expect((await page.request.get(`/users/${hostId}`)).status()).toBe(404);
+    await page.goto(`/experiences/${experience.experienceId}`, { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', {
+      name: /페이지를 찾을 수 없습니다|Page not found|ページが見つかりません|页面未找到/,
+    })).toBeVisible();
+    await expect(page.getByText(experience.title)).toHaveCount(0);
+    const search = await page.request.get('/api/search/experiences');
+    expect(search.status()).toBe(200);
+    const searchRows = (await search.json()).data as Array<{ id: string | number }>;
+    expect(searchRows.some((row) => String(row.id) === String(experience.experienceId))).toBe(false);
+    const home = await page.request.get('/api/home/experiences');
+    expect(home.status()).toBe(200);
+    const homeRows = (await home.json()).data as Array<{ id: string | number }>;
+    expect(homeRows.some((row) => String(row.id) === String(experience.experienceId))).toBe(false);
+  });
 
-    await expect(page.getByRole('heading', { name: host.fullName, exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('public-host-experiences-section')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages')).toBeVisible();
-    await expect(page.getByTestId('public-host-languages').getByText('English')).toBeVisible();
-    await expect(page.getByText(experience.title)).toBeVisible();
+  test('keeps an older approved application private when the latest is pending, revision, or rejected', async ({ page }) => {
+    const host = createHostUser();
+    const hostId = await createAuthUser(host);
+    await createHostApplication(hostId, host, 'approved');
+    const latestId = await createHostApplication(hostId, host, 'pending');
+
+    for (const status of ['pending', 'revision', 'rejected'] as const) {
+      if (status !== 'pending') {
+        const { error } = await getAdminClient().from('host_applications').update({ status }).eq('id', latestId);
+        if (error) throw error;
+      }
+      expect((await page.request.get(`/api/public/hosts/${hostId}/reviews`)).status()).toBe(404);
+      expect((await page.request.get(`/users/${hostId}`)).status()).toBe(404);
+    }
+  });
+
+  test('rejects direct approval writes by a member while preserving server moderation', async () => {
+    const host = createHostUser();
+    const hostId = await createAuthUser(host);
+    const applicationId = await createHostApplication(hostId, host, 'pending');
+    const env = loadEnv();
+    const member = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: loginError } = await member.auth.signInWithPassword({ email: host.email, password: host.password });
+    if (loginError) throw loginError;
+
+    const ownRead = await member.from('host_applications').select('status').eq('id', applicationId).single();
+    expect(ownRead.error).toBeNull();
+    expect(ownRead.data?.status).toBe('pending');
+
+    const directInsert = await member.from('host_applications').insert({ user_id: hostId, status: 'approved' });
+    expect(directInsert.error).not.toBeNull();
+    const directUpdate = await member.from('host_applications').update({ status: 'approved' }).eq('id', applicationId);
+    expect(directUpdate.error).not.toBeNull();
+    const directDelete = await member.from('host_applications').delete().eq('id', applicationId);
+    expect(directDelete.error).not.toBeNull();
+
+    const admin = getAdminClient();
+    const approved = await admin.from('host_applications').update({ status: 'approved' }).eq('id', applicationId).select('status').single();
+    expect(approved.error).toBeNull();
+    expect(approved.data?.status).toBe('approved');
+
+    const publicRow = await member.from('public_host_applications').select('*').eq('user_id', hostId).single();
+    expect(publicRow.error).toBeNull();
+    expect(publicRow.data?.status).toBe('approved');
+    for (const sensitive of ['email', 'phone', 'id_card_file', 'bank_name', 'account_number', 'admin_comment']) {
+      expect(publicRow.data).not.toHaveProperty(sensitive);
+    }
   });
 
   test('does not expose inactive-flagged experiences on the public host profile', async ({ page }) => {
@@ -448,7 +515,7 @@ test.describe.serial('Public host profile', () => {
 
     const host = createHostUser();
     const hostId = await createAuthUser(host);
-    await createHostApplication(hostId, host, 'active');
+    await createHostApplication(hostId, host, 'approved');
 
     const visibleExperience = await createActiveExperience(hostId, {
       isActive: true,
