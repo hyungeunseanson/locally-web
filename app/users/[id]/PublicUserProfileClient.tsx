@@ -1,6 +1,7 @@
 'use client';
 
 import React, { use, useEffect, useMemo, useState } from 'react';
+import NotFound from '@/app/not-found';
 import { createClient } from '@/app/utils/supabase/client';
 import SiteHeader from '@/app/components/SiteHeader';
 import { User, CheckCircle2, Star } from 'lucide-react';
@@ -217,6 +218,7 @@ export default function PublicUserProfileClient({
   }, [resolvedParams.id, supabase]);
 
   if (loading) return <div className="min-h-screen bg-white" />;
+  if (!profile) return <NotFound />;
 
   const displayName = profile?.full_name || t('public_host_profile_name_fallback');
   const activeExperienceCountLabel = t('public_host_profile_meta_active_count').replace('{count}', String(hostExperiences.length));

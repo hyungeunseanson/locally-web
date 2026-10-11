@@ -257,7 +257,7 @@ export async function generateMetadata(
       : null);
   if (!isPublicHostApplicationStatus(publicHostApplication?.status)) {
     return {
-      ...metadata,
+      title: '체험을 찾을 수 없습니다',
       robots: PRIVATE_NOINDEX_METADATA.robots,
     };
   }

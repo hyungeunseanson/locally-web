@@ -72,9 +72,8 @@ test('approved latest host supplies public initial HTML data and active experien
 
 test('latest non-public application yields no server-rendered profile or experience lookup', async () => {
   const calls = fixture({ applications: [approved, { ...approved, id: 'new', status: 'revision', created_at: '2026-10-11T00:00:00Z' }] });
-  const element = await renderPage({ params: Promise.resolve({ id: HOST_ID }) });
-  assert.equal(element.props.initialProfile, null);
-  assert.deepEqual(element.props.initialHostExperiences, []);
+  await assert.rejects(renderPage({ params: Promise.resolve({ id: HOST_ID }) }),
+    error => error?.digest === 'NEXT_HTTP_ERROR_FALLBACK;404');
   assert.equal(calls.length, 1);
 });
 
@@ -85,7 +84,7 @@ test('host eligibility query failure does not silently render an empty public pa
 
 test('malformed host IDs do not make a privileged database query', async () => {
   const calls = fixture({ applications: [] });
-  const element = await renderPage({ params: Promise.resolve({ id: 'not-a-uuid' }) });
-  assert.equal(element.props.initialProfile, null);
+  await assert.rejects(renderPage({ params: Promise.resolve({ id: 'not-a-uuid' }) }),
+    error => error?.digest === 'NEXT_HTTP_ERROR_FALLBACK;404');
   assert.equal(calls.length, 0);
 });

@@ -1,4 +1,5 @@
 import PublicUserProfileClient, { type PublicHostProfile } from './PublicUserProfileClient';
+import { notFound } from 'next/navigation';
 import { PUBLIC_EXPERIENCE_CARD_SELECT_FIELDS } from '@/app/search/searchContract';
 import {
   isPublicHostApplicationStatus,
@@ -16,7 +17,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID_PATTERN.test(id)) {
-    return <PublicUserProfileClient params={params} initialProfile={null} initialHostExperiences={[]} />;
+    notFound();
   }
   const supabase = createAdminClient();
   const { data: hostApplications, error: hostError } = await supabase
@@ -29,7 +30,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
   const latestHost = pickLatestPublicHostApplication(hostApplications || []);
   if (!latestHost?.name || !isPublicHostApplicationStatus(latestHost.status)) {
-    return <PublicUserProfileClient params={params} initialProfile={null} initialHostExperiences={[]} />;
+    notFound();
   }
 
   // Use the same public projections and active-experience filters as the client page.
