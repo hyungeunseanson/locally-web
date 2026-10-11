@@ -28,6 +28,8 @@
 | Production GET smoke | **PASS 2/2** | `npm run test:e2e:live:gate`를 `https://www.locally-travel.com`에 순차 실행. 홈·검색·상세·로그인 GET 및 익명 관리자 API 차단 확인 |
 | 격리 데이터 정리 | **PASS** | 테스트 후 Auth/화이트리스트·예약·리뷰 잔여 0. 합성 fixture와 익명 로그가 남은 임시 스택을 ID 지정해 폐기했고, 스택 목록 0건·로컬 Auth 포트 연결 거부 확인. 비추적 `.env.local`도 삭제 |
 
+PR #226의 검증 코드 커밋 `cd152c6c1462f92785685e67d9f955361df1b93a`에서 GitHub 필수 CI 7개 잡이 모두 PASS했다: [Cloudflare Foundation](https://github.com/hyungeunseanson/locally-web/actions/runs/38105106215), [PHASE1](https://github.com/hyungeunseanson/locally-web/actions/runs/38105106180), [SEO](https://github.com/hyungeunseanson/locally-web/actions/runs/38105106182), [Payment](https://github.com/hyungeunseanson/locally-web/actions/runs/38105106190), [Chat](https://github.com/hyungeunseanson/locally-web/actions/runs/38105106197). 최신 HEAD의 CI 상태는 [PR checks](https://github.com/hyungeunseanson/locally-web/pull/226/checks)에서 확인한다.
+
 ## 실패 분류 및 변경
 
 - 첫 Auth 실행에서 홈의 기존 체험 팝업이 헤더 클릭을 가렸다. `69` 테스트의 기존 안내 닫기 도우미에 팝업 닫기만 추가한 뒤 2/2가 통과했다.
