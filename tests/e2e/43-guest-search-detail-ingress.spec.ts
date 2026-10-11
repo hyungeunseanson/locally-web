@@ -22,6 +22,12 @@ async function dismissAnnouncementIfVisible(page: import('@playwright/test').Pag
     await page.getByTestId('global-site-announcement-primary').click();
     await expect(announcement).toHaveCount(0);
   }
+
+  const legacyPopup = page.getByTestId('legacy-experience-popup');
+  if (await legacyPopup.count()) {
+    await page.getByTestId('legacy-experience-popup-close').click();
+    await expect(legacyPopup).toHaveCount(0);
+  }
 }
 
 function parseExperienceIdFromHref(href: string | null) {
@@ -143,7 +149,7 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
     const durationPattern = getDurationPattern(experience.duration);
 
     await page.goto(`/search?location=${encodeURIComponent(experience.searchTerm)}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     });
     await dismissAnnouncementIfVisible(page);
 
@@ -163,7 +169,7 @@ test.describe.serial('Guest search/detail ingress smoke', () => {
 
   test('shows actionable empty state when search has no results', async ({ page }) => {
     await page.goto(`/search?location=${encodeURIComponent('codex-no-search-result-zzzz')}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     });
     await dismissAnnouncementIfVisible(page);
 

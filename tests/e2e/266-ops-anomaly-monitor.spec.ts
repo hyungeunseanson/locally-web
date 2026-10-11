@@ -784,7 +784,9 @@ test.describe('Ops Anomaly Monitor', () => {
       diagnosticCode: 'ops_anomaly_monitor_failed',
     });
     expect(unsafeResult).not.toHaveProperty('httpStatus');
-    expect(JSON.stringify(unsafeUpdates.at(-1))).not.toMatch(/private-provider-body|999/);
+    const unsafeStoredDiagnostics = Object.fromEntries(Object.entries(unsafeUpdates.at(-1) ?? {})
+      .filter(([key]) => !['finished_at', 'duration_ms', 'last_heartbeat_at', 'lease_expires_at'].includes(key)));
+    expect(JSON.stringify(unsafeStoredDiagnostics)).not.toMatch(/private-provider-body|999/);
   });
 
   test('runs only on the exact Production trigger with the independent flag enabled', async () => {

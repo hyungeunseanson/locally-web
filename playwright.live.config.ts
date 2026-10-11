@@ -24,6 +24,10 @@ const liveBaseUrl = process.env.PLAYWRIGHT_LIVE_BASE_URL || process.env.NEXT_PUB
 if (!liveBaseUrl) {
   throw new Error('Missing PLAYWRIGHT_LIVE_BASE_URL or NEXT_PUBLIC_SITE_URL for live Playwright config.');
 }
+const liveTarget = new URL(liveBaseUrl);
+if (liveTarget.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(liveTarget.hostname)) {
+  throw new Error('Write-bearing legacy live config cannot target a public site; use the read-only Production gate.');
+}
 
 export default defineConfig({
   testDir: './tests/e2e',

@@ -145,6 +145,12 @@ async function dismissAnnouncementIfVisible(page: Page) {
     await page.getByTestId('global-site-announcement-primary').click({ force: true });
     await expect(announcement).toHaveCount(0);
   }
+
+  const legacyPopup = page.getByTestId('legacy-experience-popup');
+  if (await legacyPopup.count()) {
+    await page.getByTestId('legacy-experience-popup-close').click();
+    await expect(legacyPopup).toHaveCount(0);
+  }
 }
 
 async function waitForAdminAccessFetch(page: Page) {
